@@ -58,11 +58,13 @@ PSRAM memory budget:
 
 | Region | Size |
 |--------|------|
-| LVGL frame buffers (×2) | ~900 KB |
+| LVGL frame buffer (×1) | 300 KB |
 | Raw HTML buffer | 1 MB |
-| Parsed PageElement pool | 128 KB |
-| Navigation history (50 URLs) | ~6 KB |
-| WiFi AP list (10 entries) | ~2 KB |
+| Parsed page elements + text pool | ~176 KB |
+| Navigation history (50 × 512 B) | 25 KB |
+| Image buffer — thumbnail (dynamic) | up to 128 KB |
+| Image buffer — full-size (dynamic) | up to 512 KB |
+| TLS SSL buffers (redirected to PSRAM) | ~40 KB per connection |
 
 ---
 <img width="3738" height="2304" alt="IMG_20260515_113138109_HDR" src="https://github.com/user-attachments/assets/ae6c2767-791f-45b1-826b-8fdb0ab1300c" />
