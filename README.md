@@ -18,9 +18,9 @@ https://youtu.be/If5GsIW79E0?si=GUtGvhs5Pg7Q8_43
 - **WiFi setup UI** — scan APs, enter password, stores up to 10 networks in NVS
 - **WiFi signal indicator** — live strength bar in the header
 - **Navigation history** — 50-URL back/forward stack
-- **Boot menu** — type a url, do a web or Wikipedia search, load Hackaday.com or view a HTML test page.
+- **Boot menu** — quick Wikipedia search on startup; battery voltage display (Vbat)
 - **AI Chat** — built-in chat screen backed by a server-side PHP endpoint
-- **Power management** — backlight dim → off → light-sleep after inactivity (battery build).
+- **Power management** — backlight dim → off → light-sleep after inactivity; deep-sleep Off button (battery build)
 
 ---
 
@@ -46,7 +46,7 @@ Two FreeRTOS tasks communicate via a message queue:
 ```
 Core 0 — Network Task              Core 1 — UI Task
   WiFi management                    LVGL lv_timer_handler()
-  HTTPS fetch (1 MB PSRAM buffer)    GT911 touch polling
+  HTTPS fetch (2 MB PSRAM buffer)    GT911 touch polling
   Single-pass HTML tokenizer         Widget builder
   PageElement array builder          Gesture detection
           |                                  |
@@ -59,7 +59,7 @@ PSRAM memory budget:
 | Region | Size |
 |--------|------|
 | LVGL frame buffer (×1) | 300 KB |
-| Raw HTML buffer | 1 MB |
+| Raw HTML buffer | 2 MB |
 | Parsed page elements + text pool | ~176 KB |
 | Navigation history (50 × 512 B) | 25 KB |
 | Image buffer — thumbnail (dynamic) | up to 128 KB |
@@ -185,7 +185,7 @@ babe32/
 
 ## Limitations
 
-- **Text-only by default** — images are opt-in and load slowly over the proxy chain
+- **Images load slowly** — fetched via proxy chain; can be toggled off with the IMGs button
 - **No JavaScript** — pages are rendered server-side text; interactive JS apps won't work
 - **No TLS certificate pinning** — the proxy handles TLS; the device trusts the proxy
 - **Single tab** — one page at a time
