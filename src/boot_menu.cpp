@@ -2,6 +2,7 @@
 // 190326 Replace WiFiManager portal with self-contained wifi_setup flow
 // 130526 change url of HTML test page
 // 130526 Add Off button (deep sleep, wake on BOOT button GPIO 0)
+// 130526 Add Vbat voltage display left of Light button (GPIO6 = Vbat/2)
 #include "boot_menu.h"
 #include "wifi_setup.h"
 #include "page_renderer.h"
@@ -13,6 +14,7 @@
 #include <freertos/task.h>
 #include <esp_sleep.h>
 #include <driver/gpio.h>
+#include <driver/rtc_io.h>
 
 extern bool lvgl_lock(uint32_t ms);
 extern void lvgl_unlock();
@@ -28,6 +30,7 @@ static lv_obj_t         *s_wiki_ta    = nullptr;
 static lv_obj_t         *s_inv_btn   = nullptr;
 static lv_obj_t         *s_wifi_btn  = nullptr;
 static lv_obj_t         *s_off_btn   = nullptr;
+static lv_obj_t         *s_vbat_lbl  = nullptr;
 
 struct MenuItem { const char *label; const char *url; };
 static const MenuItem s_menu[] = {
@@ -52,9 +55,10 @@ lv_obj_t *boot_menu_get_wiki_ta() {
 }
 
 static void hide_boot_buttons() {
-    if (s_inv_btn) { lv_obj_del(s_inv_btn); s_inv_btn = nullptr; }
+    if (s_inv_btn)  { lv_obj_del(s_inv_btn);  s_inv_btn  = nullptr; }
     if (s_wifi_btn) { lv_obj_del(s_wifi_btn); s_wifi_btn = nullptr; }
     if (s_off_btn)  { lv_obj_del(s_off_btn);  s_off_btn  = nullptr; }
+    if (s_vbat_lbl) { lv_obj_del(s_vbat_lbl); s_vbat_lbl = nullptr; }
 }
 
 static void menu_item_cb(lv_event_t *e) {
@@ -282,6 +286,27 @@ void show_boot_menu() {
         esp_sleep_enable_ext0_wakeup(GPIO_NUM_0, 0);  // wake: BOOT button low
         esp_deep_sleep_start();
     }, LV_EVENT_CLICKED, nullptr);
+
+    // Battery voltage display — left of Light button (GPIO5 = Vbat/2)
+    if (s_vbat_lbl) { lv_obj_del(s_vbat_lbl); s_vbat_lbl = nullptr; }
+    s_vbat_lbl = lv_label_create(lv_scr_act());
+    {
+        // GPIO6 is an RTCIO — disable both digital and RTC pull-ups
+        gpio_set_pull_mode(GPIO_NUM_6, GPIO_FLOATING);
+        rtc_gpio_pullup_dis(GPIO_NUM_6);
+        rtc_gpio_pulldown_dis(GPIO_NUM_6);
+        uint32_t acc = 0;
+        for (int i = 0; i < 8; i++) acc += analogReadMilliVolts(6);
+        uint32_t mv = (acc / 8) * 2;
+        char vbat_buf[20];
+        snprintf(vbat_buf, sizeof(vbat_buf), "Vbat\n%.2fV", mv / 1000.0f);
+        lv_label_set_text(s_vbat_lbl, vbat_buf);
+    }
+    lv_obj_set_style_text_color(s_vbat_lbl, lv_color_hex(inv ? 0x333333 : 0xCCCCCC), 0);
+    lv_obj_set_style_text_font(s_vbat_lbl, &lv_font_montserrat_14, 0);
+    lv_obj_set_style_text_align(s_vbat_lbl, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_set_pos(s_vbat_lbl, col_x, btn_y);
+    lv_obj_set_width(s_vbat_lbl, btn_x - col_x - 4);
 
     header_set_url("");
     lvgl_unlock();
