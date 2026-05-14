@@ -43,8 +43,8 @@ static lv_obj_t         *s_url_btn       = nullptr;
 static lv_obj_t         *s_img_btn       = nullptr;
 static lv_obj_t         *s_aichat_home   = nullptr;
 static bool              s_kb_visible    = false;
-static bool              s_show_links    = false;
-static bool              s_show_images   = false;
+static bool              s_show_links    = true;
+static bool              s_show_images   = true;
 static ParseResult      *s_cur_result    = nullptr;
 static ParseResult      *s_pending_result = nullptr;
 static TaskHandle_t      s_ui_task_handle = nullptr;
@@ -487,7 +487,7 @@ void ui_build_root() {
     lv_obj_align(s_url_btn, LV_ALIGN_BOTTOM_RIGHT, -4, -38);
     lv_obj_set_style_bg_opa(s_url_btn, LV_OPA_COVER, 0);
     lv_obj_set_style_bg_color(s_url_btn, lv_color_hex(0x0F3460), 0);
-    lv_obj_set_style_text_color(s_url_btn, lv_color_hex(0xE0E0E0), 0);
+    lv_obj_set_style_text_color(s_url_btn, lv_color_hex(s_show_links ? 0x4FC3F7 : 0xE0E0E0), 0);
     lv_obj_set_style_text_font(s_url_btn, &lv_font_montserrat_14, 0);
     lv_obj_set_style_text_align(s_url_btn, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_set_style_pad_top(s_url_btn, 4, 0);
@@ -504,7 +504,7 @@ void ui_build_root() {
     lv_obj_align(s_img_btn, LV_ALIGN_BOTTOM_RIGHT, -4, -72);
     lv_obj_set_style_bg_opa(s_img_btn, LV_OPA_COVER, 0);
     lv_obj_set_style_bg_color(s_img_btn, lv_color_hex(0x0F3460), 0);
-    lv_obj_set_style_text_color(s_img_btn, lv_color_hex(0xE0E0E0), 0);
+    lv_obj_set_style_text_color(s_img_btn, lv_color_hex(s_show_images ? 0x4FC3F7 : 0xE0E0E0), 0);
     lv_obj_set_style_text_font(s_img_btn, &lv_font_montserrat_14, 0);
     lv_obj_set_style_text_align(s_img_btn, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_set_style_pad_top(s_img_btn, 4, 0);

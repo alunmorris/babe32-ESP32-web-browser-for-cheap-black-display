@@ -3,7 +3,7 @@
 #pragma once
 #include <stddef.h>
 
-#define FETCH_BUF_SIZE (1024 * 1024)  // 1MB
+#define FETCH_BUF_SIZE (2 * 1024 * 1024)  // 2MB
 
 // fetch_page: fetches `url` via Brightdata residential proxy (GET).
 // Returns raw HTML body byte count, negative HTTP status on error, or -1 on connection failure.
