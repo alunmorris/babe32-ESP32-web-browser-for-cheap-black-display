@@ -1,4 +1,9 @@
-// 120326 On-screen debug log
+/*
+ * On-screen debug log
+ * Written by Alun Morris and Claude Code
+ *
+ * 120326 On-screen debug log
+ */
 #pragma once
 
 // Initialize the debug log (call before any dbg() calls)

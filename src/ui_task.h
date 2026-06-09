@@ -1,4 +1,9 @@
-// 060326 LVGL UI task pinned to core 1
+/*
+ * LVGL UI task pinned to core 1
+ * Written by Alun Morris and Claude Code
+ *
+ * 060326 LVGL UI task pinned to core 1
+ */
 #pragma once
 #include <stdint.h>
 

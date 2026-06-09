@@ -1,4 +1,9 @@
-// 060326 GT911 touch via bb_captouch, registered as LVGL indev
+/*
+ * GT911 touch via bb_captouch, registered as LVGL indev
+ * Written by Alun Morris and Claude Code
+ *
+ * 060326 GT911 touch via bb_captouch, registered as LVGL indev
+ */
 #pragma once
 #include <lvgl.h>
 

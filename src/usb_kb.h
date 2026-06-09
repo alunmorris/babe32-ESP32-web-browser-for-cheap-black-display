@@ -1,5 +1,9 @@
-// usb_kb.h — USB HID keyboard host for ESP32-S3 browser
-// 170426 Initial implementation, ported from SLUG/src/hal_s2.cpp
+/*
+ * USB HID keyboard host for ESP32-S3 browser
+ * Written by Alun Morris and Claude Code
+ *
+ * 170426 Initial implementation, ported from SLUG/src/hal_s2.cpp
+ */
 #pragma once
 #include "ble_kb.h"  // reuse BleKbEvent / BleKbEventType
 

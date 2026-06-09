@@ -1,4 +1,9 @@
-// 180326 Flat button helper for consistent UI styling
+/*
+ * Flat button helper for consistent UI styling
+ * Written by Alun Morris and Claude Code
+ *
+ * 180326 Flat button helper for consistent UI styling
+ */
 #pragma once
 #include <lvgl.h>
 

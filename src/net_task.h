@@ -1,4 +1,9 @@
-// 060326 Network task: async fetch + parse on core 0
+/*
+ * Network task: async fetch + parse on core 0
+ * Written by Alun Morris and Claude Code
+ *
+ * 060326 Network task: async fetch + parse on core 0
+ */
 #pragma once
 #include "html_parser.h"
 

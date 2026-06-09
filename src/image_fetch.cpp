@@ -1,4 +1,9 @@
-// 160326 Image fetcher via resize proxy
+/*
+ * Image fetcher via resize proxy
+ * Written by Alun Morris and Claude Code
+ *
+ * 160326 Image fetcher via resize proxy
+ */
 #include "image_fetch.h"
 #include "fetcher.h"
 #include "url_utils.h"

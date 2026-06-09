@@ -1,5 +1,10 @@
-// 060326 Single-pass HTML tokenizer -> PageElement array in PSRAM
-// 160326 Add assume_body param to html_parse for partial HTML
+/*
+ * Single-pass HTML tokenizer -> PageElement array in PSRAM
+ * Written by Alun Morris and Claude Code
+ *
+ * 060326 Single-pass HTML tokenizer -> PageElement array in PSRAM
+ * 160326 Add assume_body param to html_parse for partial HTML
+ */
 #pragma once
 #include <stddef.h>
 #include <stdint.h>

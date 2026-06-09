@@ -1,4 +1,9 @@
-// 120326 On-screen debug log
+/*
+ * On-screen debug log
+ * Written by Alun Morris and Claude Code
+ *
+ * 120326 On-screen debug log
+ */
 #include "dbglog.h"
 #include <Arduino.h>
 #include <stdio.h>

@@ -1,4 +1,9 @@
-// 060326 PSRAM-backed navigation history
+/*
+ * PSRAM-backed navigation history
+ * Written by Alun Morris and Claude Code
+ *
+ * 060326 PSRAM-backed navigation history
+ */
 #include "history.h"
 #include <Arduino.h>
 #include <string.h>

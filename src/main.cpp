@@ -1,7 +1,12 @@
-// 060326 Browser entry point: WiFi first, then UI task
-// 110326 Force WiFi PHY init before display PSRAM DMA to avoid MMU fault
-// 120326 NTP time sync after WiFi connect
-// 190326 Remove portal fallback — WiFi setup handled by UI
+/*
+ * Browser entry point: WiFi first, then UI task
+ * Written by Alun Morris and Claude Code
+ *
+ * 060326 Browser entry point: WiFi first, then UI task
+ * 110326 Force WiFi PHY init before display PSRAM DMA to avoid MMU fault
+ * 120326 NTP time sync after WiFi connect
+ * 190326 Remove portal fallback — WiFi setup handled by UI
+ */
 #include <Arduino.h>
 #include <WiFi.h>
 #include <esp_wifi.h>

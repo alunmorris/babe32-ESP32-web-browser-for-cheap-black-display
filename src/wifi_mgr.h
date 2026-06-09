@@ -1,4 +1,9 @@
-// 060326 Multi-AP WiFi manager: 10 slots in NVS, scan-and-match
+/*
+ * Multi-AP WiFi manager: 10 slots in NVS, scan-and-match
+ * Written by Alun Morris and Claude Code
+ *
+ * 060326 Multi-AP WiFi manager: 10 slots in NVS, scan-and-match
+ */
 #pragma once
 #include <stdbool.h>
 

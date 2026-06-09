@@ -1,4 +1,9 @@
-// 060326 URL resolution logic
+/*
+ * URL resolution logic
+ * Written by Alun Morris and Claude Code
+ *
+ * 060326 URL resolution logic
+ */
 #include "url_utils.h"
 #include <string.h>
 #include <stdio.h>

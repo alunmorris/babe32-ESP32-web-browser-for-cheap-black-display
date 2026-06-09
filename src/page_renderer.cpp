@@ -1,6 +1,11 @@
-// 060326 LVGL page renderer
-// 130326 Add form widget rendering (input, select, submit)
-// 160326 Add inline image rendering via proxy
+/*
+ * LVGL page renderer
+ * Written by Alun Morris and Claude Code
+ *
+ * 060326 LVGL page renderer
+ * 130326 Add form widget rendering (input, select, submit)
+ * 160326 Add inline image rendering via proxy
+ */
 #include "page_renderer.h"
 #include "image_fetch.h"
 #include "url_utils.h"

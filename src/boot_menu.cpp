@@ -1,8 +1,13 @@
-// 180326 Boot menu and wiki search screens (extracted from ui_task.cpp)
-// 190326 Replace WiFiManager portal with self-contained wifi_setup flow
-// 130526 change url of HTML test page
-// 130526 Add Off button (deep sleep, wake on BOOT button GPIO 0)
-// 130526 Add Vbat voltage display left of Light button (GPIO6 = Vbat/2)
+/*
+ * Boot menu and wiki search screens (extracted from ui_task.cpp)
+ * Written by Alun Morris and Claude Code
+ *
+ * 180326 Boot menu and wiki search screens (extracted from ui_task.cpp)
+ * 190326 Replace WiFiManager portal with self-contained wifi_setup flow
+ * 130526 change url of HTML test page
+ * 130526 Add Off button (deep sleep, wake on BOOT button GPIO 0)
+ * 130526 Add Vbat voltage display left of Light button (GPIO6 = Vbat/2)
+ */
 #include "boot_menu.h"
 #include "wifi_setup.h"
 #include "page_renderer.h"

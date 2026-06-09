@@ -1,4 +1,9 @@
-// 180326 Custom 5-row keyboard maps (extracted from ui_task.cpp)
+/*
+ * Custom 5-row keyboard maps (extracted from ui_task.cpp)
+ * Written by Alun Morris and Claude Code
+ *
+ * 180326 Custom 5-row keyboard maps (extracted from ui_task.cpp)
+ */
 #pragma once
 #include <lvgl.h>
 

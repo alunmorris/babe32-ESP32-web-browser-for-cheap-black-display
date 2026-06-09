@@ -1,5 +1,10 @@
-// 060326 NVS-backed multi-AP WiFi with scan-and-match
-// 190326 Remove WiFiManager portal (replaced by wifi_setup.cpp)
+/*
+ * NVS-backed multi-AP WiFi with scan-and-match
+ * Written by Alun Morris and Claude Code
+ *
+ * 060326 NVS-backed multi-AP WiFi with scan-and-match
+ * 190326 Remove WiFiManager portal (replaced by wifi_setup.cpp)
+ */
 #include "wifi_mgr.h"
 #include <Arduino.h>
 #include <WiFi.h>

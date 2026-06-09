@@ -1,4 +1,9 @@
-// 060326 URL resolution: relative -> absolute
+/*
+ * URL resolution: relative -> absolute
+ * Written by Alun Morris and Claude Code
+ *
+ * 060326 URL resolution: relative -> absolute
+ */
 #pragma once
 #include <stddef.h>
 

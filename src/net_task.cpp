@@ -1,5 +1,10 @@
-// 060326 FreeRTOS network task on core 0
-// 130326 Add POST support for form submission
+/*
+ * FreeRTOS network task on core 0
+ * Written by Alun Morris and Claude Code
+ *
+ * 060326 FreeRTOS network task on core 0
+ * 130326 Add POST support for form submission
+ */
 #include "net_task.h"
 #include "fetcher.h"
 #include "dbglog.h"

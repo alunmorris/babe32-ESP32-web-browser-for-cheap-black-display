@@ -1,7 +1,12 @@
-// 060326 Header bar implementation
-// 120326 Remove forward button; enlarge back button hit area
-// 120326 URL bar is now a textarea for keyboard input
-// 190326 WiFi signal strength indicator below Home button
+/*
+ * Header bar implementation
+ * Written by Alun Morris and Claude Code
+ *
+ * 060326 Header bar implementation
+ * 120326 Remove forward button; enlarge back button hit area
+ * 120326 URL bar is now a textarea for keyboard input
+ * 190326 WiFi signal strength indicator below Home button
+ */
 #include "ui_header.h"
 #include <Arduino.h>
 #include <WiFi.h>

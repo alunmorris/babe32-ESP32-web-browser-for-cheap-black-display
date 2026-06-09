@@ -1,5 +1,10 @@
-// 060326 Build LVGL widgets from parsed PageElement list
-// 160326 Add show_images param for inline image rendering
+/*
+ * Build LVGL widgets from parsed PageElement list
+ * Written by Alun Morris and Claude Code
+ *
+ * 060326 Build LVGL widgets from parsed PageElement list
+ * 160326 Add show_images param for inline image rendering
+ */
 #pragma once
 #include <lvgl.h>
 #include "html_parser.h"

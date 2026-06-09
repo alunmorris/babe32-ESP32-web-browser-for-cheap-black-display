@@ -1,4 +1,9 @@
-// 190326 Battery power management — 4-state machine + light sleep polling loop
+/*
+ * Battery power management — 4-state machine + light sleep polling loop
+ * Written by Alun Morris and Claude Code
+ *
+ * 190326 Battery power management — 4-state machine + light sleep polling loop
+ */
 #ifdef BATTERY_MODE
 
 #include "power_mgr.h"

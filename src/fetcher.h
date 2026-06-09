@@ -1,5 +1,10 @@
-// 060326 HTTPS page fetcher into PSRAM buffer
-// 120326 Added fetch_disconnect() for persistent connection cleanup
+/*
+ * HTTPS page fetcher into PSRAM buffer
+ * Written by Alun Morris and Claude Code
+ *
+ * 060326 HTTPS page fetcher into PSRAM buffer
+ * 120326 Added fetch_disconnect() for persistent connection cleanup
+ */
 #pragma once
 #include <stddef.h>
 

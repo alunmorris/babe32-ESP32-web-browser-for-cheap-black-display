@@ -1,4 +1,9 @@
-// 180326 Background image fetch task
+/*
+ * Background image fetch task
+ * Written by Alun Morris and Claude Code
+ *
+ * 180326 Background image fetch task
+ */
 #include "img_task.h"
 #include "image_fetch.h"
 #include "dbglog.h"

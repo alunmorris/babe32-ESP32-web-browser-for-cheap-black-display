@@ -1,4 +1,9 @@
-// 060326 50-URL navigation history stack in PSRAM
+/*
+ * 50-URL navigation history stack in PSRAM
+ * Written by Alun Morris and Claude Code
+ *
+ * 060326 50-URL navigation history stack in PSRAM
+ */
 #pragma once
 #include <stdbool.h>
 

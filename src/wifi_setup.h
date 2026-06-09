@@ -1,4 +1,9 @@
-// 190326 Self-contained WiFi setup: AP scan, password entry, NVS credential store
+/*
+ * Self-contained WiFi setup: AP scan, password entry, NVS credential store
+ * Written by Alun Morris and Claude Code
+ *
+ * 190326 Self-contained WiFi setup: AP scan, password entry, NVS credential store
+ */
 #pragma once
 #include <lvgl.h>
 

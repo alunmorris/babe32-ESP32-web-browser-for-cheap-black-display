@@ -1,6 +1,11 @@
-// 110326 AXS15231 touch on I2C SDA=4 SCL=8 for JC3248W535C
-// 120326 Direct I2C driver — bb_captouch has AXS15231 behind #ifdef FUTURE
-// 130326 Transform portrait touch → landscape coordinates (CW 90°)
+/*
+ * AXS15231 touch on I2C SDA=4 SCL=8 for JC3248W535C
+ * Written by Alun Morris and Claude Code
+ *
+ * 110326 AXS15231 touch on I2C SDA=4 SCL=8 for JC3248W535C
+ * 120326 Direct I2C driver — bb_captouch has AXS15231 behind #ifdef FUTURE
+ * 130326 Transform portrait touch → landscape coordinates (CW 90°)
+ */
 #include "touch.h"
 #include "dbglog.h"
 #include <Arduino.h>

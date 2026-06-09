@@ -1,4 +1,9 @@
-// 160326 Image fetcher via resize proxy
+/*
+ * Image fetcher via resize proxy
+ * Written by Alun Morris and Claude Code
+ *
+ * 160326 Image fetcher via resize proxy
+ */
 #pragma once
 #include <stddef.h>
 #include <stdint.h>

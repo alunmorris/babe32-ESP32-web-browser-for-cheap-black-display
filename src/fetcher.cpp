@@ -1,7 +1,12 @@
-// 060326 Fetch via Brightdata proxy, return raw HTML body, follow redirects
-// 120326 Persistent TLS connection, keep-alive, batched write, DNS cache
-// 190326 PHP proxy (webmashing.com) as primary, Brightdata as fallback
-// 130526 Redirect mbedTLS allocs to PSRAM — internal heap too fragmented for 40KB SSL buffers
+/*
+ * Fetch via Brightdata proxy, return raw HTML body, follow redirects
+ * Written by Alun Morris and Claude Code
+ *
+ * 060326 Fetch via Brightdata proxy, return raw HTML body, follow redirects
+ * 120326 Persistent TLS connection, keep-alive, batched write, DNS cache
+ * 190326 PHP proxy (webmashing.com) as primary, Brightdata as fallback
+ * 130526 Redirect mbedTLS allocs to PSRAM — internal heap too fragmented for 40KB SSL buffers
+ */
 #include "fetcher.h"
 #include "image_fetch.h"
 #include "url_utils.h"

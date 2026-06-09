@@ -1,14 +1,17 @@
-// ble_kb.cpp — NimBLE BLE HID keyboard host for ESP32-S3 browser
-// 160426 Initial port from ai-chatbot/SLUG/src/hal_c3.cpp
-// 170426 SLUG halBeforeApiCall/halAfterApiCall pattern: coex not WiFi stop
-// 170426 Redirect mbedTLS alloc to PSRAM after NimBLE consumes ~62KB internal RAM
-// 170426 Disconnect BLE before each fetch (vTaskSuspend reconnect task) for full WiFi radio
-//
-// STATUS: NOT WORKING RELIABLY — WiFi/BLE radio conflicts on ESP32-S3 cause significant
-// page load slowdown even when BLE is disconnected during fetches. NimBLE host stack
-// consumes ~62KB internal SRAM, forcing mbedTLS SSL buffers into PSRAM and degrading
-// TLS throughput. BLE keyboard reconnect after each page load adds further latency.
-// The non-BLE build is substantially faster. Retained for future investigation.
+/*
+ * NimBLE BLE HID keyboard host for ESP32-S3 browser
+ * Written by Alun Morris and Claude Code
+ *
+ * 160426 Initial port from ai-chatbot/SLUG/src/hal_c3.cpp
+ * 170426 SLUG halBeforeApiCall/halAfterApiCall pattern: coex not WiFi stop
+ * 170426 Redirect mbedTLS alloc to PSRAM after NimBLE consumes ~62KB internal RAM
+ * 170426 Disconnect BLE before each fetch (vTaskSuspend reconnect task) for full WiFi radio
+ * STATUS: NOT WORKING RELIABLY — WiFi/BLE radio conflicts on ESP32-S3 cause significant
+ * page load slowdown even when BLE is disconnected during fetches. NimBLE host stack
+ * consumes ~62KB internal SRAM, forcing mbedTLS SSL buffers into PSRAM and degrading
+ * TLS throughput. BLE keyboard reconnect after each page load adds further latency.
+ * The non-BLE build is substantially faster. Retained for future investigation.
+ */
 #ifdef BLE_KEYBOARD
 #include "ble_kb.h"
 #include <Arduino.h>

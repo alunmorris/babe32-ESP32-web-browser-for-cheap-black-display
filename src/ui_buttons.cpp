@@ -1,4 +1,9 @@
-// 180326 Flat button helper
+/*
+ * Flat button helper
+ * Written by Alun Morris and Claude Code
+ *
+ * 180326 Flat button helper
+ */
 #include "ui_buttons.h"
 
 lv_obj_t *create_flat_btn(lv_obj_t *parent, const char *text,

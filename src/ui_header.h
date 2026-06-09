@@ -1,5 +1,10 @@
-// 060326 Header bar: back/forward buttons + URL textarea
-// 120326 Add keyboard support for URL entry
+/*
+ * Header bar: back/forward buttons + URL textarea
+ * Written by Alun Morris and Claude Code
+ *
+ * 060326 Header bar: back/forward buttons + URL textarea
+ * 120326 Add keyboard support for URL entry
+ */
 #pragma once
 #include <lvgl.h>
 

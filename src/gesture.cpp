@@ -1,4 +1,9 @@
-// 060326 Swipe gesture: >50px horizontal, <30px vertical drift
+/*
+ * Swipe gesture: >50px horizontal, <30px vertical drift
+ * Written by Alun Morris and Claude Code
+ *
+ * 060326 Swipe gesture: >50px horizontal, <30px vertical drift
+ */
 #include "gesture.h"
 #include <Arduino.h>
 

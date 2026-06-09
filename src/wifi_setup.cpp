@@ -1,5 +1,10 @@
-// 190326 Self-contained WiFi setup: AP scan, password entry, NVS credential store
-// NVS namespace "wifimgr" matches wifi_mgr.cpp — existing saved APs are preserved.
+/*
+ * Self-contained WiFi setup: AP scan, password entry, NVS credential store
+ * Written by Alun Morris and Claude Code
+ *
+ * 190326 Self-contained WiFi setup: AP scan, password entry, NVS credential store
+ * NVS namespace "wifimgr" matches wifi_mgr.cpp — existing saved APs are preserved.
+ */
 #include "wifi_setup.h"
 #include "ui_header.h"
 #include "ui_buttons.h"

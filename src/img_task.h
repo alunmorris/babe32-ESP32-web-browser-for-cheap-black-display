@@ -1,4 +1,9 @@
-// 180326 Background image fetch task — fetches images on core 0 via queues
+/*
+ * Background image fetch task — fetches images on core 0 via queues
+ * Written by Alun Morris and Claude Code
+ *
+ * 180326 Background image fetch task — fetches images on core 0 via queues
+ */
 #pragma once
 #include <stddef.h>
 #include <stdint.h>

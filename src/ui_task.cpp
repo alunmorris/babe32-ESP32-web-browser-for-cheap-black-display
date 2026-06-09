@@ -1,10 +1,15 @@
-// 060326 Full browser UI wiring
-// 110326 Replace diagnostic loop with full LVGL + browser init
-// 120326 Fix cross-core rendering via task notification; sync flush + full invalidate
-// 120326 Add on-screen keyboard for URL entry
-// 130326 Reduce keyboard height for landscape layout
-// 160326 Add Stop button for partial page render, AI Chat home button, menu items
-// 190326 Integrate wifi_setup module; WiFi wait timeout; remove portal check
+/*
+ * Full browser UI wiring
+ * Written by Alun Morris and Claude Code
+ *
+ * 060326 Full browser UI wiring
+ * 110326 Replace diagnostic loop with full LVGL + browser init
+ * 120326 Fix cross-core rendering via task notification; sync flush + full invalidate
+ * 120326 Add on-screen keyboard for URL entry
+ * 130326 Reduce keyboard height for landscape layout
+ * 160326 Add Stop button for partial page render, AI Chat home button, menu items
+ * 190326 Integrate wifi_setup module; WiFi wait timeout; remove portal check
+ */
 #include "ui_task.h"
 #include "usb_kb.h"
 #include "ui_header.h"

@@ -1,4 +1,9 @@
-// 180326 Boot menu and wiki search screens (extracted from ui_task.cpp)
+/*
+ * Boot menu and wiki search screens (extracted from ui_task.cpp)
+ * Written by Alun Morris and Claude Code
+ *
+ * 180326 Boot menu and wiki search screens (extracted from ui_task.cpp)
+ */
 #pragma once
 #include <lvgl.h>
 

@@ -1,4 +1,9 @@
-// 060326 Swipe gesture detection
+/*
+ * Swipe gesture detection
+ * Written by Alun Morris and Claude Code
+ *
+ * 060326 Swipe gesture detection
+ */
 #pragma once
 #include <lvgl.h>
 

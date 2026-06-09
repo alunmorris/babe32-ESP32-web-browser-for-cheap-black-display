@@ -1,8 +1,12 @@
-// usb_kb.cpp — USB HID keyboard host for ESP32-S3 browser
-// 170426 Ported from SLUG/src/hal_s2.cpp (ESP32-S2 Mini, proven working)
-// GPIO 19/20: D-/D+ USB OTG. Keyboard must be self-powered or VBUS provided.
-// ARDUINO_USB_CDC_ON_BOOT=0 required to free OTG from CDC device mode.
-// No WiFi/BLE radio conflicts — no before/after fetch hooks needed.
+/*
+ * USB HID keyboard host for ESP32-S3 browser
+ * Written by Alun Morris and Claude Code
+ *
+ * 170426 Ported from SLUG/src/hal_s2.cpp (ESP32-S2 Mini, proven working)
+ * GPIO 19/20: D-/D+ USB OTG. Keyboard must be self-powered or VBUS provided.
+ * ARDUINO_USB_CDC_ON_BOOT=0 required to free OTG from CDC device mode.
+ * No WiFi/BLE radio conflicts — no before/after fetch hooks needed.
+ */
 #ifdef USB_KEYBOARD
 #include "usb_kb.h"
 #include <Arduino.h>

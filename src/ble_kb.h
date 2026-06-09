@@ -1,4 +1,7 @@
-// ble_kb.h — NimBLE HID keyboard host for ESP32-S3 browser
+/*
+ * NimBLE HID keyboard host for ESP32-S3 browser
+ * Written by Alun Morris and Claude Code
+ */
 #pragma once
 #include <stdbool.h>
 
