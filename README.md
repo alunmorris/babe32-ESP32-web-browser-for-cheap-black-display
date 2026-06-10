@@ -140,8 +140,6 @@ Connect two 150k resistors in series between U2 (IP5306) pin 6 (BAT) and ground.
 ```
 babe32/
 ├── platformio.ini
-├── partitions_16MB.csv
-├── lv_conf.h
 └── src/
     ├── main.cpp               # Entry point
     ├── display.{h,cpp}        # AXS15231B QSPI display driver + LVGL flush
