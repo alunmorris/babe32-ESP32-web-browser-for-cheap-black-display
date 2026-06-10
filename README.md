@@ -130,6 +130,8 @@ Upload `src/server/aichat.php` to your web server and update the endpoint URL in
 ### Battery Voltage (optional)
 
 Connect two 150k resistors in series between U2 (IP5306) pin 6 (BAT) and ground. Connect the middle (voltage = BAT/2) to GP106. Note that GP105 has an internal pullup and can't be used for this.
+<img width="2048" height="1343" alt="WhatsApp Image 2026-06-10 at 08 57 02 (1)" src="https://github.com/user-attachments/assets/e2ccc9f0-85a7-4cdc-a5ae-d553c505bbd5" />
+<img width="2048" height="1268" alt="WhatsApp Image 2026-06-10 at 08 57 02" src="https://github.com/user-attachments/assets/40085866-0940-4755-a599-d8b8a4d69241" />
 
 ---
 
