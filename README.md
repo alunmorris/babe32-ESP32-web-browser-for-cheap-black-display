@@ -14,7 +14,6 @@ https://youtu.be/If5GsIW79E0?si=GUtGvhs5Pg7Q8_43
 - **HTML forms** — text inputs, dropdowns, submit buttons (GET and POST)
 - **Touch navigation** — swipe left/right for back/forward; tap links; pull-to-refresh
 - **On-screen keyboard** — LVGL keyboard slides up on text focus
-- **External keyboard** — BLE HID keyboard support
 - **WiFi setup UI** — scan APs, enter password, stores up to 10 networks in NVS
 - **WiFi signal indicator** — live strength bar in the header
 - **Navigation history** — 50-URL back/forward stack
@@ -131,25 +130,6 @@ Upload `src/server/aichat.php` to your web server and update the endpoint URL in
 ### Battery Voltage (optional)
 
 Connect two 150k resistors in series between U2 (IP5306) pin 6 (BAT) and ground. Connect the middle (voltage = BAT/2) to GP106. Note that GP105 has an internal pullup and can't be used for this.
-
----
-
-## External Keyboard
-
-> **⚠ Deprecated — BLE keyboard support (`deprecated/bluetooth-kb` branch) is not recommended.**
-> The NimBLE host stack consumes ~62 KB of internal SRAM, leaving insufficient memory for TLS
-> connections. Even with workarounds, WiFi/BLE radio coexistence on the ESP32-S3 causes
-> significant page load slowdowns. Use the standard build without BLE.
-
-**BLE keyboard** — pairing happens automatically on first connect. Any BLE HID keyboard should work.
-
-| Key | Action |
-|-----|--------|
-| `Ctrl+L` | Focus URL bar |
-| `Enter` (URL bar) | Navigate to URL |
-| `Enter` (link focused) | Follow link |
-| `Backspace` | Delete / back |
-| Arrow keys | Scroll page |
 
 ---
 
