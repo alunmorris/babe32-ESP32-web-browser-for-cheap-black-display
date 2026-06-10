@@ -157,7 +157,6 @@ babe32/
     ├── history.{h,cpp}        # 50-URL navigation history
     ├── boot_menu.{h,cpp}      # Boot screen + Wikipedia search
     ├── gesture.{h,cpp}        # Swipe detection
-    ├── ble_kb.{h,cpp}         # BLE HID keyboard host
     ├── power_mgr.{h,cpp}      # Battery power management
     ├── ui_header.{h,cpp}      # Header bar (back/fwd/URL/signal)
     ├── ui_buttons.{h,cpp}     # Toolbar buttons

@@ -11,7 +11,6 @@
  * 190326 Integrate wifi_setup module; WiFi wait timeout; remove portal check
  */
 #include "ui_task.h"
-#include "usb_kb.h"
 #include "ui_header.h"
 #include "page_renderer.h"
 #include "boot_menu.h"
@@ -563,8 +562,6 @@ static void ui_task_fn(void *arg) {
         lvgl_unlock();
     }
 
-    usb_kb_init();
-
     net_task_start(on_page_ready);
     img_task_start();
 
@@ -816,42 +813,6 @@ static void ui_task_fn(void *arg) {
         power_mgr_tick();
 #endif
 
-        // Physical USB keyboard input
-        {
-            BleKbEvent kev;
-            while (usb_kb_poll(&kev)) {
-                if (lvgl_lock(10)) {
-                    switch (kev.type) {
-                    case BLE_KB_CHAR:
-                        if (s_focused_ta) lv_textarea_add_char(s_focused_ta, kev.ch);
-                        break;
-                    case BLE_KB_BACKSPACE:
-                        if (s_focused_ta) lv_textarea_del_char(s_focused_ta);
-                        break;
-                    case BLE_KB_CURSOR_LEFT:
-                        if (s_focused_ta) lv_textarea_cursor_left(s_focused_ta);
-                        break;
-                    case BLE_KB_CURSOR_RIGHT:
-                        if (s_focused_ta) lv_textarea_cursor_right(s_focused_ta);
-                        break;
-                    case BLE_KB_ENTER:
-                        if (s_focused_ta) {
-                            lv_keyboard_set_textarea(s_kb, s_focused_ta);
-                            lv_event_send(s_kb, LV_EVENT_READY, NULL);
-                        }
-                        break;
-                    case BLE_KB_ESCAPE:   kb_hide(); break;
-                    case BLE_KB_SCROLL_UP:
-                        lv_obj_scroll_by(s_content, 0, -120, LV_ANIM_OFF); break;
-                    case BLE_KB_SCROLL_DOWN:
-                        lv_obj_scroll_by(s_content, 0,  120, LV_ANIM_OFF); break;
-                    case BLE_KB_URL_FOCUS: kb_show(); break;
-                    default: break;
-                    }
-                    lvgl_unlock();
-                }
-            }
-        }
 
         vTaskDelay(pdMS_TO_TICKS(5));
     }
