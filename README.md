@@ -21,6 +21,7 @@ https://youtu.be/If5GsIW79E0?si=GUtGvhs5Pg7Q8_43
 - **Boot menu** — quick Wikipedia search on startup; battery voltage display (Vbat)
 - **AI Chat** — built-in chat screen backed by a server-side PHP endpoint
 - **Power management** — backlight dim → off → light-sleep after inactivity; deep-sleep Off button (battery build)
+- **Battery voltage displayed** — needs circuit mod
 
 ---
 
@@ -126,6 +127,10 @@ Without at least one proxy configured the browser will not load pages.
 ### AI Chat (optional)
 
 Upload `src/server/aichat.php` to your web server and update the endpoint URL in `src/ui_task.cpp`. The chat screen will then be available from the boot menu.
+
+### Battery Voltage (optional)
+
+Connect two 150k resistors in series between U2 (IP5306) pin 6 (BAT) and ground. Connect the middle (voltage = BAT/2) to GP106. Note that GP105 has an internal pullup and can't be used for this.
 
 ---
 
