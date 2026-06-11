@@ -6,9 +6,9 @@
  * 120326 Persistent TLS connection, keep-alive, batched write, DNS cache
  * 190326 PHP proxy (webmashing.com) as primary, Brightdata as fallback
  * 130526 Redirect mbedTLS allocs to PSRAM — internal heap too fragmented for 40KB SSL buffers
+ * 100626 Stop closing image TLS connection on page fetch — both stay persistent
  */
 #include "fetcher.h"
-#include "image_fetch.h"
 #include "url_utils.h"
 #include "dbglog.h"
 #include <Arduino.h>
@@ -108,7 +108,6 @@ static bool ensure_php_connected() {
         return true;
     }
     close_client();
-    image_fetch_disconnect();
 
     s_client = new WiFiClientSecure();
     s_client->setInsecure();
@@ -133,7 +132,6 @@ static bool ensure_connected() {
         return true;
     }
     close_client();
-    image_fetch_disconnect();
 
     if (!s_dns_cached) {
         dbg("DNS resolve %s...", PROXY_HOST);

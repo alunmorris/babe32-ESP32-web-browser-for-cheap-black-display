@@ -3,9 +3,9 @@
  * Written by Alun Morris and Claude Code
  *
  * 160326 Image fetcher via resize proxy
+ * 100626 Stop closing page TLS connection on image fetch — both stay persistent
  */
 #include "image_fetch.h"
-#include "fetcher.h"
 #include "url_utils.h"
 #include "dbglog.h"
 #include <Arduino.h>
@@ -21,9 +21,8 @@ static void img_mutex_init() {
 }
 
 static bool ensure_connected() {
-    // Always free main fetcher's TLS to reclaim internal RAM for image SSL
-    fetch_disconnect();
-
+    // SSL buffers live in PSRAM, so this connection can coexist with the
+    // page fetcher's — reuse it across images to avoid TLS handshakes
     if (s_img_client && s_img_client->connected()) return true;
 
     // Destroy old client to fully release SSL buffers
