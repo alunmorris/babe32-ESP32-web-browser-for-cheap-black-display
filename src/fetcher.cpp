@@ -7,6 +7,7 @@
  * 190326 PHP proxy (webmashing.com) as primary, Brightdata as fallback
  * 130526 Redirect mbedTLS allocs to PSRAM — internal heap too fragmented for 40KB SSL buffers
  * 100626 Stop closing image TLS connection on page fetch — both stay persistent
+ * 100626 Direct-to-origin fetch first; proxies only for hosts that block us
  */
 #include "fetcher.h"
 #include "url_utils.h"
@@ -51,10 +52,16 @@ static const char *PROXY_AUTH =
 static IPAddress   s_proxy_ip;
 static bool        s_dns_cached = false;
 
-// Single persistent TLS connection — shared between PHP and Brightdata to save RAM
-enum ConnType { CONN_NONE, CONN_PHP, CONN_BRIGHTDATA };
+// Single persistent TLS connection — shared between direct, PHP and Brightdata
+enum ConnType { CONN_NONE, CONN_DIRECT, CONN_PHP, CONN_BRIGHTDATA };
 static WiFiClientSecure *s_client   = nullptr;
 static ConnType           s_conn_type = CONN_NONE;
+static char               s_direct_host[128] = "";
+
+// Hosts that refused a direct fetch this session — go straight to proxy for these
+#define BLOCKED_MAX 4
+static char s_blocked[BLOCKED_MAX][128];
+static int  s_blocked_next = 0;
 
 // Cookie jar: store cookies for multiple hosts
 #define COOKIE_MAX_HOSTS 4
@@ -164,6 +171,7 @@ void fetch_disconnect() {
     close_client();
     s_dns_cached = false;
     s_proxy_ip = IPAddress();
+    memset(s_blocked, 0, sizeof(s_blocked));  // a block verdict may be stale after reconnect
     dbg("Fetch connection closed");
 }
 
@@ -294,7 +302,58 @@ static void parse_url(const char *url, char *host, size_t host_len,
     *path_out = sl ? sl : "/";
 }
 
-static int do_request(const char *url, const char *post_body, size_t *total_out) {
+// Strip HTTP headers from fetch_buf in place. Returns body length, -1 if no separator.
+static int extract_body(size_t total) {
+    char *body = strstr(fetch_buf, "\r\n\r\n");
+    if (!body) { dbg("No header separator"); return -1; }
+    body += 4;
+    size_t body_len = total - (size_t)(body - fetch_buf);
+    memmove(fetch_buf, body, body_len);
+    fetch_buf[body_len] = '\0';
+    return (int)body_len;
+}
+
+// On cancel, salvage whatever body bytes have arrived. Returns body length or -1.
+static int salvage_partial(size_t total) {
+    char *body = strstr(fetch_buf, "\r\n\r\n");
+    if (body) {
+        body += 4;
+        size_t hdr_sz = (size_t)(body - fetch_buf);
+        if (total > hdr_sz) {
+            size_t body_len = total - hdr_sz;
+            memmove(fetch_buf, body, body_len);
+            fetch_buf[body_len] = '\0';
+            dbg("CANCEL: returning %zu bytes partial body", body_len);
+            return (int)body_len;
+        }
+    }
+    dbg("CANCEL: no body data");
+    return -1;
+}
+
+static bool host_blocked(const char *url) {
+    char host[128] = {};
+    const char *p;
+    parse_url(url, host, sizeof(host), &p);
+    for (int i = 0; i < BLOCKED_MAX; i++)
+        if (s_blocked[i][0] && strcmp(s_blocked[i], host) == 0) return true;
+    return false;
+}
+
+static void block_host(const char *url) {
+    if (WiFi.status() != WL_CONNECTED) return;  // network trouble, not a block
+    if (host_blocked(url)) return;
+    char host[128] = {};
+    const char *p;
+    parse_url(url, host, sizeof(host), &p);
+    strncpy(s_blocked[s_blocked_next], host, sizeof(s_blocked[0]) - 1);
+    s_blocked[s_blocked_next][sizeof(s_blocked[0]) - 1] = '\0';
+    s_blocked_next = (s_blocked_next + 1) % BLOCKED_MAX;
+    dbg("Direct blocked: %s — using proxy from now on", host);
+}
+
+static int do_request(const char *url, const char *post_body, bool via_proxy,
+                      size_t *total_out) {
     *total_out = 0;
 
     // s_client must already be connected (proxy or direct)
@@ -329,7 +388,7 @@ static int do_request(const char *url, const char *post_body, size_t *total_out)
             "Connection: close\r\n\r\n"
             "%s",
             path, host, cookie_hdr, strlen(post_body), post_body);
-    } else {
+    } else if (via_proxy) {
         // Proxy connection: use full URL, include proxy auth
         req_len = snprintf(req, sizeof(req),
             "GET %s HTTP/1.1\r\n"
@@ -342,6 +401,18 @@ static int do_request(const char *url, const char *post_body, size_t *total_out)
             "%s"
             "Connection: keep-alive\r\n\r\n",
             url, host, PROXY_AUTH, cookie_hdr);
+    } else {
+        // Direct origin connection: path only, no proxy auth
+        req_len = snprintf(req, sizeof(req),
+            "GET %s HTTP/1.1\r\n"
+            "Host: %s\r\n"
+            "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36\r\n"
+            "Accept: text/html,application/xhtml+xml;q=0.9,*/*;q=0.8\r\n"
+            "Accept-Language: en-US,en;q=0.5\r\n"
+            "Accept-Encoding: identity\r\n"
+            "%s"
+            "Connection: keep-alive\r\n\r\n",
+            path, host, cookie_hdr);
     }
 
     if (req_len >= (int)sizeof(req)) {
@@ -537,12 +608,18 @@ static int do_request(const char *url, const char *post_body, size_t *total_out)
     return status;
 }
 
-// Connect directly to target host (for POST — proxy doesn't support it)
+// Connect directly to the target origin (primary path for GET, only path for POST).
+// Reuses the existing connection when it's still up and to the same host.
 static bool ensure_direct(const char *url) {
     char host[128] = {};
     const char *path;
     parse_url(url, host, sizeof(host), &path);
 
+    if (s_client && s_conn_type == CONN_DIRECT && s_client->connected() &&
+        strcmp(host, s_direct_host) == 0) {
+        dbg("Reusing direct TLS to %s", host);
+        return true;
+    }
     close_client();
 
     s_client = new WiFiClientSecure();
@@ -556,7 +633,9 @@ static bool ensure_direct(const char *url) {
         s_client = nullptr;
         return false;
     }
-    s_conn_type = CONN_NONE;  // direct — not a named proxy
+    s_conn_type = CONN_DIRECT;
+    strncpy(s_direct_host, host, sizeof(s_direct_host) - 1);
+    s_direct_host[sizeof(s_direct_host) - 1] = '\0';
     dbg("Direct TLS connected in %lums", millis() - t0);
     return true;
 }
@@ -671,20 +750,85 @@ static int fetch_impl(const char *url, const char *post_body, char **buf_out) {
     // Only send POST body on the first request; redirects become GET
     const char *cur_body = post_body;
 
-    // Try PHP proxy first for GET requests (follows redirects server-side)
+    // Direct-to-origin first: the device is a real browser on a residential IP,
+    // so most sites serve it directly. Proxies are fallback for hosts that block us.
+    if (!cur_body && strncmp(cur_url, "https://", 8) == 0 && !host_blocked(cur_url)) {
+        for (int attempt = 0; attempt < 5 && !s_cancel; attempt++) {
+            dbg("Direct attempt %d: %.40s", attempt + 1, cur_url);
+            if (!ensure_direct(cur_url)) {
+                block_host(cur_url);
+                break;
+            }
+
+            size_t total = 0;
+            int status = do_request(cur_url, nullptr, false, &total);
+
+            if (s_cancel) {
+                int partial = salvage_partial(total);
+                close_client();  // mid-body abort leaves the socket unusable
+                return partial;
+            }
+
+            if (status == 0 || total == 0) {
+                if (attempt == 0) {
+                    dbg("Direct: reconnecting after failure...");
+                    continue;  // stale keep-alive — one retry with a fresh socket
+                }
+                block_host(cur_url);
+                break;
+            }
+
+            if (status == 200) {
+                int body_len = extract_body(total);
+                if (body_len >= 0) {
+                    dbg("Direct OK: %d bytes", body_len);
+                    return body_len;
+                }
+                close_client();
+                break;  // malformed response — let the proxy try
+            }
+
+            if (status >= 301 && status <= 308) {
+                char *loc = strcasestr(fetch_buf, "\r\nLocation:");
+                if (!loc) { close_client(); break; }
+                loc += 11;
+                while (*loc == ' ') loc++;
+                char *end = strstr(loc, "\r\n");
+                if (!end) { close_client(); break; }
+                size_t len = (size_t)(end - loc);
+                char loc_str[512];
+                if (len >= sizeof(loc_str)) len = sizeof(loc_str) - 1;
+                strncpy(loc_str, loc, len);
+                loc_str[len] = '\0';
+                char resolved[512];
+                if (!url_resolve(cur_url, loc_str, resolved, sizeof(resolved))) {
+                    close_client();
+                    break;
+                }
+                strncpy(cur_url, resolved, sizeof(cur_url) - 1);
+                cur_url[sizeof(cur_url) - 1] = '\0';
+                dbg("Direct redirect -> %.40s", cur_url);
+                if (strncmp(cur_url, "https://", 8) != 0) break;  // http: proxy handles it
+                continue;
+            }
+
+            dbg("Direct HTTP %d — falling back to proxy", status);
+            block_host(cur_url);
+            break;
+        }
+        if (s_cancel) return -1;
+    }
+
+    // PHP proxy fallback for GET (follows redirects server-side)
     if (!cur_body) {
         if (ensure_php_connected()) {
             size_t total = 0;
             int status = do_php_request(cur_url, &total);
             if (!s_cancel && status == 200 && total > 0) {
-                char *body = strstr(fetch_buf, "\r\n\r\n");
-                if (body) {
-                    body += 4;
-                    size_t body_len = total - (size_t)(body - fetch_buf);
-                    memmove(fetch_buf, body, body_len);
-                    fetch_buf[body_len] = '\0';
-                    dbg("PHP proxy OK: %zu bytes", body_len);
-                    return (int)body_len;
+                int body_len = extract_body(total);
+                if (body_len >= 0) {
+                    dbg("PHP proxy OK: %d bytes", body_len);
+                    return body_len;
                 }
             }
             dbg("PHP proxy failed (status=%d), falling back to Brightdata", status);
@@ -704,36 +848,16 @@ static int fetch_impl(const char *url, const char *post_body, char **buf_out) {
         }
 
         size_t total = 0;
-        int status = do_request(cur_url, cur_body, &total);
+        int status = do_request(cur_url, cur_body, cur_body == nullptr, &total);
 
-        // Clean up direct connection after use
-        if (cur_body && s_client) {
-            s_client->stop();
-            delete s_client;
-            s_client = nullptr;
-        }
+        // Clean up direct connection after POST (Connection: close was sent)
+        if (cur_body) close_client();
 
         if (s_cancel) {
-            // Cancelled — return whatever body we have
             dbg("CANCEL: status=%d total=%zu", status, total);
-            char *body = strstr(fetch_buf, "\r\n\r\n");
-            dbg("CANCEL: header_end=%s", body ? "found" : "NOT found");
-            if (body) {
-                body += 4;
-                size_t hdr_sz = (size_t)(body - fetch_buf);
-                dbg("CANCEL: hdr_sz=%zu total=%zu body_avail=%zu", hdr_sz, total, total > hdr_sz ? total - hdr_sz : 0);
-                if (total > hdr_sz) {
-                    size_t body_len = total - hdr_sz;
-                    memmove(fetch_buf, body, body_len);
-                    fetch_buf[body_len] = '\0';
-                    dbg("CANCEL: returning %zu bytes partial body", body_len);
-                    return (int)body_len;
-                }
-            }
-            // Clean up connection
-            if (s_client) { s_client->stop(); delete s_client; s_client = nullptr; }
-            dbg("CANCEL: no body data, returning -1");
-            return -1;
+            int partial = salvage_partial(total);
+            close_client();  // mid-body abort leaves the socket unusable
+            return partial;
         }
 
         if (status == 0 || total == 0) {
@@ -746,14 +870,10 @@ static int fetch_impl(const char *url, const char *post_body, char **buf_out) {
         }
 
         if (status == 200) {
-            char *body = strstr(fetch_buf, "\r\n\r\n");
-            if (!body) { dbg("No header separator"); return -1; }
-            body += 4;
-            size_t body_len = total - (size_t)(body - fetch_buf);
-            memmove(fetch_buf, body, body_len);
-            fetch_buf[body_len] = '\0';
-            dbg("HTML body: %zu bytes", body_len);
-            return (int)body_len;
+            int body_len = extract_body(total);
+            if (body_len < 0) return -1;
+            dbg("HTML body: %d bytes", body_len);
+            return body_len;
         }
 
         if (status >= 301 && status <= 308) {
