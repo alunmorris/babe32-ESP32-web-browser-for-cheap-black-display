@@ -1,6 +1,6 @@
 # Babe32 — Barely Adequate Browser ESP32
 
-A text web browser that runs on the Cheap Black Display (CBD) - a cheap ESP32-S3 capacitive touchscreen module. It fetches pages via a pass-through proxy, renders a subset of HTML with LVGL. Optionally loads images. No Javascript - be realistic!
+A text web browser that runs on the Cheap Black Display (CBD) - a cheap ESP32-S3 capacitive touchscreen module. It fetches pages directly or via proxy fallback, renders a subset of HTML with LVGL. Optionally loads images. No Javascript - be realistic!
 
 <img width="2467" height="1705" alt="IMG_20260515_112920734_HDR~2" src="https://github.com/user-attachments/assets/7ffdf1d2-8a12-4af6-b262-b229d2e6b059" />
 
@@ -8,7 +8,7 @@ https://youtu.be/If5GsIW79E0?si=GUtGvhs5Pg7Q8_43
 ---
 ## Features
 
-- **Web browsing** — fetches raw HTML (1MB max) via a self-hosted PHP proxy (primary) with Brightdata residential proxy as fallback; rendered as plain text by the on-device HTML parser
+- **Web browsing** — fetches raw HTML (1MB max) directly over TLS; falls back to a self-hosted PHP proxy, then a Brightdata residential proxy for sites that block direct requests; rendered as plain text by the on-device HTML parser
 - **HTML rendering** — headings (h1–h6), paragraphs, links, bold/italic/monospace, font sizes, inline colour
 - **Image viewing** — thumbnail images fetched via a resize proxy, tappable for full-screen view
 - **HTML forms** — text inputs, dropdowns, submit buttons (GET and POST)
@@ -111,17 +111,17 @@ pio device monitor
 
 On first boot, open the boot menu and tap **WiFi Setup**. The browser scans for networks, you enter the password, and credentials are saved to NVS. Up to 10 networks are stored; the device tries each on startup.
 
-### Proxy Setup (required)
+### Proxy Setup (optional but recommended)
 
-Babe32 fetches pages through two proxies in sequence:
+Babe32 tries to fetch pages directly over TLS first. If a site blocks direct requests (detected per session), it falls back to two proxies in order:
 
-1. **Primary — self-hosted PHP proxy** (`src/server/babe32proxy.php`)  
+1. **Fallback 1 — self-hosted PHP proxy** (`src/server/babe32proxy.php`)  
    Upload this to any PHP web host. Set `PHP_HOST` and `PHP_PATH` in `src/fetcher.cpp` to point at your server.
 
-2. **Fallback — Brightdata residential proxy**  
+2. **Fallback 2 — Brightdata residential proxy**  
    Sign up at [brightdata.com](https://brightdata.com), create a residential proxy, and fill in `PROXY_HOST`, `PROXY_PORT`, and `PROXY_AUTH` in `src/fetcher.cpp`. Brightdata is paid for but very cheap.
 
-Without at least one proxy configured the browser will not load pages.
+Many sites work without any proxy configured. For sites that block direct device requests (e.g. some news sites), the PHP proxy is sufficient.
 
 ### AI Chat (optional)
 
@@ -161,7 +161,8 @@ babe32/
     ├── ui_header.{h,cpp}      # Header bar (back/fwd/URL/signal)
     ├── ui_buttons.{h,cpp}     # Toolbar buttons
     └── server/
-        ├── babe32proxy.php    # Self-hosted fetch proxy
+        ├── babe32proxy.php    # Self-hosted fetch proxy (fallback)
+        ├── image-resize.php   # Image resize proxy
         └── aichat.php         # AI chat backend
 ```
 
@@ -169,9 +170,9 @@ babe32/
 
 ## Limitations
 
-- **Images load slowly** — fetched via proxy chain; can be toggled off with the IMGs button
+- **Images load slowly** — fetched via resize proxy; can be toggled off with the IMGs button
 - **No JavaScript** — pages are rendered server-side text; interactive JS apps won't work
-- **No TLS certificate pinning** — the proxy handles TLS; the device trusts the proxy
+- **No TLS certificate pinning** — the device accepts any certificate; use a trusted network
 - **Single tab** — one page at a time
 - **480×320 landscape display** — pages are reformatted to fit the width
 
