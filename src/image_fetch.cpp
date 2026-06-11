@@ -4,6 +4,7 @@
  *
  * 160326 Image fetcher via resize proxy
  * 100626 Stop closing page TLS connection on image fetch — both stay persistent
+ * 100626 If resized image < screen, transform Wikimedia URL and re-fetch via proxy
  */
 #include "image_fetch.h"
 #include "url_utils.h"
@@ -15,6 +16,54 @@
 
 static WiFiClientSecure *s_img_client = nullptr;
 static SemaphoreHandle_t s_img_mutex = nullptr;
+
+// Parse image pixel dimensions from a raw JPEG or PNG header.
+static bool get_image_dims(const uint8_t *data, size_t len, int *w, int *h) {
+    if (!data || len < 24) return false;
+    // PNG: 8-byte magic, then IHDR chunk: 4-byte len, "IHDR", 4-byte w, 4-byte h
+    if (data[0] == 0x89 && data[1] == 0x50 && data[2] == 0x4E && data[3] == 0x47) {
+        *w = (data[16]<<24)|(data[17]<<16)|(data[18]<<8)|data[19];
+        *h = (data[20]<<24)|(data[21]<<16)|(data[22]<<8)|data[23];
+        return *w > 0 && *h > 0;
+    }
+    // JPEG: scan for SOF marker (FF C0-C3, C5-C7, C9-CB)
+    if (data[0] != 0xFF || data[1] != 0xD8) return false;
+    size_t i = 2;
+    while (i + 8 < len) {
+        while (i < len && data[i] != 0xFF) i++;
+        if (i + 1 >= len) break;
+        uint8_t m = data[i+1];
+        if ((m >= 0xC0 && m <= 0xC3) || (m >= 0xC5 && m <= 0xC7) || (m >= 0xC9 && m <= 0xCB)) {
+            *h = (data[i+5]<<8)|data[i+6];
+            *w = (data[i+7]<<8)|data[i+8];
+            return *w > 0 && *h > 0;
+        }
+        if (i + 3 >= len) break;
+        uint16_t seg = (data[i+2]<<8)|data[i+3];
+        if (seg < 2) break;
+        i += 2 + seg;
+    }
+    return false;
+}
+
+// Transform a Wikimedia thumbnail URL to the full-resolution URL.
+// e.g. .../thumb/a/ab/File.jpg/250px-File.jpg  ->  .../a/ab/File.jpg
+// Returns true if the URL matched the pattern.
+static bool wikimedia_thumb_to_full(const char *thumb_url, char *out, size_t out_cap) {
+    if (!strstr(thumb_url, "upload.wikimedia.org")) return false;
+    const char *thumb = strstr(thumb_url, "/thumb/");
+    if (!thumb) return false;
+    size_t pre = (size_t)(thumb - thumb_url);
+    const char *after = thumb + 6;  // skip "/thumb"
+    const char *last_slash = strrchr(after, '/');
+    if (!last_slash) return false;
+    size_t rest = (size_t)(last_slash - after);
+    if (pre + rest + 1 > out_cap) return false;
+    memcpy(out, thumb_url, pre);
+    memcpy(out + pre, after, rest);
+    out[pre + rest] = '\0';
+    return true;
+}
 
 static void img_mutex_init() {
     if (!s_img_mutex) s_img_mutex = xSemaphoreCreateMutex();
@@ -245,8 +294,27 @@ uint8_t *image_fetch(const char *img_url, size_t *out_len) {
 uint8_t *image_fetch_full(const char *img_url, size_t *out_len) {
     img_mutex_init();
     xSemaphoreTake(s_img_mutex, portMAX_DELAY);
-    uint8_t *r = fetch_resized(img_url, out_len,
-                         IMAGE_FULL_W, IMAGE_FULL_H, 80, 512 * 1024);
+    uint8_t *r = fetch_resized(img_url, out_len, IMAGE_FULL_W, IMAGE_FULL_H, 80, 512 * 1024);
+
+    // If the proxy returned something smaller than the screen in both dimensions,
+    // the img_url is itself a thumbnail. For Wikimedia, derive the full-resolution
+    // URL and re-fetch through the proxy at screen size.
+    if (r && *out_len > 0) {
+        int img_w = 0, img_h = 0;
+        if (get_image_dims(r, *out_len, &img_w, &img_h) &&
+            img_w > 0 && img_h > 0 &&
+            img_w < IMAGE_FULL_W && img_h < IMAGE_FULL_H) {
+            char full_url[768];
+            if (wikimedia_thumb_to_full(img_url, full_url, sizeof(full_url))) {
+                dbg("img_full: %dx%d < screen, fetching full: %.50s", img_w, img_h, full_url);
+                heap_caps_free(r);
+                r = fetch_resized(full_url, out_len, IMAGE_FULL_W, IMAGE_FULL_H, 80, 512 * 1024);
+            } else {
+                dbg("img_full: source %dx%d is genuinely small", img_w, img_h);
+            }
+        }
+    }
+
     xSemaphoreGive(s_img_mutex);
     return r;
 }

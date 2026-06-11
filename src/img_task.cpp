@@ -42,7 +42,7 @@ static void img_task_fn(void *arg) {
 void img_task_start() {
     s_req_queue = xQueueCreate(16, sizeof(ImgRequest));
     s_res_queue = xQueueCreate(4, sizeof(ImgResult));
-    xTaskCreatePinnedToCore(img_task_fn, "img_task", 12288, nullptr, 3, nullptr, 0);
+    xTaskCreatePinnedToCore(img_task_fn, "img_task", 16384, nullptr, 3, nullptr, 0);
 }
 
 void img_task_post(const ImgRequest *req) {

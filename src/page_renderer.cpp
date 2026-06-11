@@ -519,12 +519,25 @@ void page_img_full_set(uint8_t *data, size_t len) {
         img_h = hdr.h;
     }
 
+    // Scale down to fit the screen if the image is larger
+    uint16_t zoom = LV_IMG_ZOOM_NONE;
+    if (img_w > IMAGE_FULL_W || img_h > IMAGE_FULL_H) {
+        float sx = (float)IMAGE_FULL_W / img_w;
+        float sy = (float)IMAGE_FULL_H / img_h;
+        float s  = sx < sy ? sx : sy;
+        zoom  = (uint16_t)(s * LV_IMG_ZOOM_NONE);
+        if (zoom < 1) zoom = 1;
+        img_w = (int)(img_w * s);
+        img_h = (int)(img_h * s);
+    }
+
     // Replace loading text with image
     lv_obj_clean(s_overlay);
     lv_obj_add_event_cb(s_overlay, overlay_close_cb, LV_EVENT_CLICKED, NULL);
     lv_obj_t *img = lv_img_create(s_overlay);
-    lv_obj_set_size(img, img_w, img_h);
     lv_img_set_src(img, &s_full_dsc);
+    if (zoom != LV_IMG_ZOOM_NONE) lv_img_set_zoom(img, zoom);
+    lv_obj_set_size(img, img_w, img_h);
     lv_obj_center(img);
 }
 
