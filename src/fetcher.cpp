@@ -10,6 +10,7 @@
  * 100626 Direct-to-origin fetch first; proxies only for hosts that block us
  */
 #include "fetcher.h"
+#include "secrets.h"
 #include "url_utils.h"
 #include "dbglog.h"
 #include <Arduino.h>
@@ -40,20 +41,12 @@ static void ensure_buf() {
 }
 
 // Own PHP proxy (primary for GET)
-static const char *PHP_HOST = "webmashing.com";
+static const char *PHP_HOST = SECRET_PHP_HOST;
 static const int   PHP_PORT = 443;
-static const char *PHP_PATH = "/babe32proxy.php";
+static const char *PHP_PATH = SECRET_PHP_PATH;
 
-// Brightdata residential proxy (fallback for GET)
-static const char *PROXY_HOST = "brd.superproxy.io";
-static const int   PROXY_PORT = 33335;
-static const char *PROXY_AUTH =
-    "Basic YnJkLWN1c3RvbWVyLWhsX2E2Zjg5MTU3LXpvbmUtcmVzaWRlbnRpYWxfcHJveHkxOmRhcWNtZnhqdTkzNA==";
-static IPAddress   s_proxy_ip;
-static bool        s_dns_cached = false;
-
-// Single persistent TLS connection — shared between direct, PHP and Brightdata
-enum ConnType { CONN_NONE, CONN_DIRECT, CONN_PHP, CONN_BRIGHTDATA };
+// Single persistent TLS connection — direct or PHP proxy
+enum ConnType { CONN_NONE, CONN_DIRECT, CONN_PHP };
 static WiFiClientSecure *s_client   = nullptr;
 static ConnType           s_conn_type = CONN_NONE;
 static char               s_direct_host[128] = "";
@@ -132,45 +125,8 @@ static bool ensure_php_connected() {
     return true;
 }
 
-// Connect s_client to Brightdata (closes PHP connection if open)
-static bool ensure_connected() {
-    if (s_client && s_conn_type == CONN_BRIGHTDATA && s_client->connected()) {
-        dbg("Reusing TLS connection");
-        return true;
-    }
-    close_client();
-
-    if (!s_dns_cached) {
-        dbg("DNS resolve %s...", PROXY_HOST);
-        uint32_t t0 = millis();
-        if (!WiFiGenericClass::hostByName(PROXY_HOST, s_proxy_ip)) {
-            dbg("DNS FAIL after %lums", millis() - t0);
-            return false;
-        }
-        s_dns_cached = true;
-        dbg("DNS: %s -> %s in %lums", PROXY_HOST, s_proxy_ip.toString().c_str(), millis() - t0);
-    }
-
-    s_client = new WiFiClientSecure();
-    s_client->setInsecure();
-    s_client->setTimeout(10);
-    dbg("TLS connect %s:%d...", s_proxy_ip.toString().c_str(), PROXY_PORT);
-    uint32_t t0 = millis();
-    if (!s_client->connect(s_proxy_ip, PROXY_PORT)) {
-        dbg("Proxy FAIL after %lums", millis() - t0);
-        delete s_client;
-        s_client = nullptr;
-        return false;
-    }
-    s_conn_type = CONN_BRIGHTDATA;
-    dbg("TLS connected in %lums", millis() - t0);
-    return true;
-}
-
 void fetch_disconnect() {
     close_client();
-    s_dns_cached = false;
-    s_proxy_ip = IPAddress();
     memset(s_blocked, 0, sizeof(s_blocked));  // a block verdict may be stale after reconnect
     dbg("Fetch connection closed");
 }
@@ -352,8 +308,7 @@ static void block_host(const char *url) {
     dbg("Direct blocked: %s — using proxy from now on", host);
 }
 
-static int do_request(const char *url, const char *post_body, bool via_proxy,
-                      size_t *total_out) {
+static int do_request(const char *url, const char *post_body, size_t *total_out) {
     *total_out = 0;
 
     // s_client must already be connected (proxy or direct)
@@ -388,19 +343,6 @@ static int do_request(const char *url, const char *post_body, bool via_proxy,
             "Connection: close\r\n\r\n"
             "%s",
             path, host, cookie_hdr, strlen(post_body), post_body);
-    } else if (via_proxy) {
-        // Proxy connection: use full URL, include proxy auth
-        req_len = snprintf(req, sizeof(req),
-            "GET %s HTTP/1.1\r\n"
-            "Host: %s\r\n"
-            "Proxy-Authorization: %s\r\n"
-            "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36\r\n"
-            "Accept: text/html,application/xhtml+xml;q=0.9,*/*;q=0.8\r\n"
-            "Accept-Language: en-US,en;q=0.5\r\n"
-            "Accept-Encoding: identity\r\n"
-            "%s"
-            "Connection: keep-alive\r\n\r\n",
-            url, host, PROXY_AUTH, cookie_hdr);
     } else {
         // Direct origin connection: path only, no proxy auth
         req_len = snprintf(req, sizeof(req),
@@ -576,7 +518,7 @@ static int do_request(const char *url, const char *post_body, bool via_proxy,
     }
 
     // For 200 responses, read body into fetch_buf after headers
-    if (status == 200) {
+    if (status >= 200 && status < 300) {
         size_t body_bytes = 0;
         if (content_length >= 0) {
             dbg("Reading %ld bytes (Content-Length)", content_length);
@@ -651,13 +593,13 @@ static int do_php_request(const char *url, size_t *total_out) {
 
     char req[1024];
     int req_len = snprintf(req, sizeof(req),
-        "GET %s?url=%s HTTP/1.1\r\n"
+        "GET %s?token=%s&url=%s HTTP/1.1\r\n"
         "Host: %s\r\n"
         "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36\r\n"
         "Accept: text/html,application/xhtml+xml;q=0.9,*/*;q=0.8\r\n"
         "Accept-Encoding: identity\r\n"
         "Connection: keep-alive\r\n\r\n",
-        PHP_PATH, encoded, PHP_HOST);
+        PHP_PATH, SECRET_PHP_TOKEN, encoded, PHP_HOST);
 
     if (req_len >= (int)sizeof(req)) { dbg("PHP req too large"); return 0; }
 
@@ -710,7 +652,7 @@ static int do_php_request(const char *url, size_t *total_out) {
         if (te) { te += 20; while (*te == ' ') te++; if (strncasecmp(te, "chunked", 7) == 0) chunked = true; }
     }
 
-    if (status == 200) {
+    if (status >= 200 && status < 300) {
         size_t body_bytes = 0;
         if (content_length >= 0) {
             body_bytes = read_exact(hdr_len, (size_t)content_length);
@@ -761,7 +703,7 @@ static int fetch_impl(const char *url, const char *post_body, char **buf_out) {
             }
 
             size_t total = 0;
-            int status = do_request(cur_url, nullptr, false, &total);
+            int status = do_request(cur_url, nullptr, &total);
 
             if (s_cancel) {
                 int partial = salvage_partial(total);
@@ -778,7 +720,7 @@ static int fetch_impl(const char *url, const char *post_body, char **buf_out) {
                 break;
             }
 
-            if (status == 200) {
+            if (status >= 200 && status < 300) {
                 int body_len = extract_body(total);
                 if (body_len >= 0) {
                     dbg("Direct OK: %d bytes", body_len);
@@ -819,105 +761,82 @@ static int fetch_impl(const char *url, const char *post_body, char **buf_out) {
         if (s_cancel) return -1;
     }
 
-    // PHP proxy fallback for GET (follows redirects server-side)
+    // If the direct loop landed on http:// (e.g. argos redirects https→http), upgrade back
+    // to https before handing off — Akamai/Cloudflare block plain-HTTP proxy requests
+    if (strncmp(cur_url, "http://", 7) == 0) {
+        char tmp[512];
+        snprintf(tmp, sizeof(tmp), "https://%s", cur_url + 7);
+        strncpy(cur_url, tmp, sizeof(cur_url) - 1);
+        cur_url[sizeof(cur_url) - 1] = '\0';
+        dbg("Upgraded http→https for proxy: %.60s", cur_url);
+    }
+
+    // PHP proxy fallback for GET — silent retry once before reporting failure.
     if (!cur_body) {
-        if (ensure_php_connected()) {
+        int php_status = 0;
+        for (int php_attempt = 0; php_attempt < 2 && !s_cancel; php_attempt++) {
+            if (!ensure_php_connected()) break;
             size_t total = 0;
-            int status = do_php_request(cur_url, &total);
-            if (!s_cancel && status == 200 && total > 0) {
+            php_status = do_php_request(cur_url, &total);
+            if (!s_cancel && php_status >= 200 && php_status < 300 && total > 0) {
                 int body_len = extract_body(total);
                 if (body_len >= 0) {
                     dbg("PHP proxy OK: %d bytes", body_len);
                     return body_len;
                 }
             }
-            dbg("PHP proxy failed (status=%d), falling back to Brightdata", status);
-            // close_client() will be called inside ensure_connected() on next attempt
+            close_client();
         }
+        dbg("PHP proxy failed (status=%d)", php_status);
     }
 
-    for (int attempt = 0; attempt < 5; attempt++) {
-        if (s_cancel) break;
-        dbg("Attempt %d: %.40s", attempt + 1, cur_url);
+    // Full failure — tear down all connections so the next page starts clean
+    fetch_disconnect();
 
-        // Connect: direct for POST, proxy for GET
-        if (cur_body) {
+    // POST: direct only (no proxy path for form submissions)
+    if (cur_body) {
+        for (int attempt = 0; attempt < 2 && !s_cancel; attempt++) {
             if (!ensure_direct(cur_url)) return -1;
-        } else {
-            if (!ensure_connected()) return -1;
-        }
-
-        size_t total = 0;
-        int status = do_request(cur_url, cur_body, cur_body == nullptr, &total);
-
-        // Clean up direct connection after POST (Connection: close was sent)
-        if (cur_body) close_client();
-
-        if (s_cancel) {
-            dbg("CANCEL: status=%d total=%zu", status, total);
-            int partial = salvage_partial(total);
-            close_client();  // mid-body abort leaves the socket unusable
-            return partial;
-        }
-
-        if (status == 0 || total == 0) {
-            if (attempt == 0) {
-                dbg("Reconnecting after failure...");
-                continue;  // retry via loop
+            size_t total = 0;
+            int status = do_request(cur_url, cur_body, &total);
+            close_client();  // POST uses Connection: close
+            if (s_cancel) return salvage_partial(total);
+            if (status == 0 || total == 0) { dbg("POST: no response"); continue; }
+            if (status >= 200 && status < 300) {
+                int body_len = extract_body(total);
+                if (body_len >= 0) { dbg("POST OK: %d bytes", body_len); return body_len; }
             }
-            dbg("No response");
+            if (status >= 301 && status <= 308) {
+                char *loc = strcasestr(fetch_buf, "\r\nLocation:");
+                if (!loc) return -1;
+                loc += 11; while (*loc == ' ') loc++;
+                char *end = strstr(loc, "\r\n"); if (!end) return -1;
+                size_t len = (size_t)(end - loc);
+                char loc_str[512]; if (len >= sizeof(loc_str)) len = sizeof(loc_str) - 1;
+                strncpy(loc_str, loc, len); loc_str[len] = '\0';
+                char resolved[512];
+                if (!url_resolve(cur_url, loc_str, resolved, sizeof(resolved))) return -1;
+                strncpy(cur_url, resolved, sizeof(cur_url) - 1);
+                cur_body = nullptr;  // redirect becomes GET — fall through to proxy
+                dbg("POST redirect -> %.40s", cur_url);
+                break;
+            }
+            dbg("POST HTTP %d", status);
             return -1;
         }
+        if (cur_body) return -1;  // still POST after retries — give up
 
-        if (status == 200) {
-            int body_len = extract_body(total);
-            if (body_len < 0) return -1;
-            dbg("HTML body: %d bytes", body_len);
-            return body_len;
-        }
-
-        if (status >= 301 && status <= 308) {
-            char *loc = strcasestr(fetch_buf, "\r\nLocation:");
-            if (!loc) { dbg("Redirect no Location"); return -1; }
-            loc += 11;
-            while (*loc == ' ') loc++;
-            char *end = strstr(loc, "\r\n");
-            if (!end) { dbg("Malformed Location"); return -1; }
-            size_t len = (size_t)(end - loc);
-            char loc_str[512];
-            if (len >= sizeof(loc_str)) len = sizeof(loc_str) - 1;
-            strncpy(loc_str, loc, len);
-            loc_str[len] = '\0';
-            // Resolve relative redirects against current URL
-            char resolved[512];
-            if (!url_resolve(cur_url, loc_str, resolved, sizeof(resolved))) {
-                dbg("Cannot resolve redirect URL");
-                return -1;
+        // POST redirected to GET — try PHP proxy
+        if (ensure_php_connected()) {
+            size_t total = 0;
+            int status = do_php_request(cur_url, &total);
+            if (!s_cancel && status >= 200 && status < 300 && total > 0) {
+                int body_len = extract_body(total);
+                if (body_len >= 0) { dbg("POST→GET PHP OK: %d bytes", body_len); return body_len; }
             }
-            strncpy(cur_url, resolved, sizeof(cur_url) - 1);
-            cur_url[sizeof(cur_url) - 1] = '\0';
-            cur_body = nullptr;  // redirects become GET
-            dbg("Redirect -> %.40s", cur_url);
-            continue;
         }
-
-        if (status == 402) {
-            // Brightdata rate-limit on this exit node — pause briefly then retry
-            // (lwIP DNS cache means we usually reconnect to the same superproxy IP,
-            //  but Brightdata rotates the residential exit node on each new connection)
-            close_client();
-            s_dns_cached = false;
-            s_proxy_ip = IPAddress();
-            dbg("402 rate limit, pausing before retry (attempt %d)...", attempt + 1);
-            delay(1000);
-            continue;
-        }
-
-        dbg("HTTP error %d", status);
-        return -status;
     }
 
-    dbg("Too many redirects");
     return -1;
 }
 

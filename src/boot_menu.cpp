@@ -211,6 +211,17 @@ void show_boot_menu() {
     lv_obj_set_width(title, LV_HOR_RES);
     lv_obj_set_pos(title, -3, 9);
 
+    // Subtitle
+    lv_obj_t *sub = lv_label_create(s_content);
+    lv_label_set_text(sub, "Browse like it's 1999");
+    lv_obj_add_flag(sub, LV_OBJ_FLAG_FLOATING);
+    lv_obj_set_width(sub, LV_HOR_RES);
+    lv_obj_set_style_text_color(sub,
+        lv_color_hex(inv ? 0x008800 : 0x00C853), 0);
+    lv_obj_set_style_text_font(sub, &lv_font_montserrat_16, 0);
+    lv_obj_set_style_text_align(sub, LV_TEXT_ALIGN_RIGHT, 0);
+    lv_obj_set_pos(sub, -3, 42);
+
     // Menu items
     int y_pos = 80;
     for (int i = 0; i < s_menu_count; i++) {

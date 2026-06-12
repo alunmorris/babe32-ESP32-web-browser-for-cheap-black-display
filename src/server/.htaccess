@@ -1,0 +1,24 @@
+RewriteEngine On
+
+<IfModule mod_mime.c>
+    AddType application/wasm .wasm
+    AddType application/javascript .js
+</IfModule>
+
+<IfModule mod_headers.c>
+    Header strset ETag ""
+    FileETag None
+
+    Header set Cache-Control "max-age=0, no-cache, no-store, must-revalidate"
+    Header set Pragma "no-cache"
+    Header set Expires "Wed, 11 Jan 1984 05:00:00 GMT"
+</IfModule>
+
+<IfModule mod_expires.c>
+    ExpiresActive Off
+</IfModule>
+
+# Block direct HTTP access to secrets files
+<FilesMatch "_secrets\.php$">
+    Require all denied
+</FilesMatch>

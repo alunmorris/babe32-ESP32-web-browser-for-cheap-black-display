@@ -5,3 +5,5 @@
 *:Zone.Identifier
 *.orig
 src/server/aichat_secrets.php
+src/server/babe32proxy_secrets.php
+src/secrets.h
