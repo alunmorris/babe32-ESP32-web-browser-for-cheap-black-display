@@ -1,4 +1,5 @@
 # Babe32 — Barely Adequate Browser ESP32
+**Browsing like it's 1999**
 
 A text web browser that runs on the Cheap Black Display (CBD) - a cheap ESP32-S3 capacitive touchscreen module. It fetches pages directly or via proxy fallback, renders a subset of HTML with LVGL. Optionally loads images. No Javascript - be realistic!
 
