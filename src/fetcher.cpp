@@ -8,6 +8,7 @@
  * 130526 Redirect mbedTLS allocs to PSRAM — internal heap too fragmented for 40KB SSL buffers
  * 100626 Stop closing image TLS connection on page fetch — both stay persistent
  * 100626 Direct-to-origin fetch first; proxies only for hosts that block us
+ * 120626 Chrome cipher suite order on direct TLS to reduce JA3 bot detection
  */
 #include "fetcher.h"
 #include "secrets.h"
@@ -39,6 +40,38 @@ static void ensure_buf() {
         fetch_buf = (char *)heap_caps_malloc(FETCH_BUF_SIZE, MALLOC_CAP_SPIRAM);
     }
 }
+
+// Subclass exposes protected sslclient so we can set cipher suites between TCP connect
+// and TLS handshake.  setPlainStart() defers the handshake; we patch ciphersuite_list
+// in ssl_conf (ssl_ctx holds a pointer to conf, so the change takes effect in the
+// handshake), then call startTLS() to complete it.
+class BrowserTLSClient : public WiFiClientSecure {
+public:
+    bool connectWithChromeCiphers(const char *host, uint16_t port) {
+        // Chrome 120 TLS 1.2 cipher suite order (matches JA3 fingerprint)
+        static const int chrome_suites[] = {
+            MBEDTLS_TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
+            MBEDTLS_TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
+            MBEDTLS_TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
+            MBEDTLS_TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
+#ifdef MBEDTLS_CHACHAPOLY_C
+            MBEDTLS_TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256,
+            MBEDTLS_TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256,
+#endif
+            MBEDTLS_TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA,
+            MBEDTLS_TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA,
+            MBEDTLS_TLS_RSA_WITH_AES_128_GCM_SHA256,
+            MBEDTLS_TLS_RSA_WITH_AES_256_GCM_SHA384,
+            MBEDTLS_TLS_RSA_WITH_AES_128_CBC_SHA,
+            MBEDTLS_TLS_RSA_WITH_AES_256_CBC_SHA,
+            0
+        };
+        setPlainStart();  // defer TLS handshake so we can patch cipher list first
+        if (!WiFiClientSecure::connect(host, port)) return false;
+        mbedtls_ssl_conf_ciphersuites(&sslclient->ssl_conf, chrome_suites);
+        return startTLS() == 1;
+    }
+};
 
 // Own PHP proxy (primary for GET)
 static const char *PHP_HOST = SECRET_PHP_HOST;
@@ -220,7 +253,26 @@ static int read_chunked_body(size_t body_start) {
         line[li] = '\0';
 
         unsigned long chunk_size = strtoul(line, nullptr, 16);
-        if (chunk_size == 0) break;  // final chunk
+        if (chunk_size == 0) {
+            // Drain chunked trailers + terminating blank line (read lines until empty)
+            uint32_t idle = millis();
+            bool done = false;
+            while (!s_cancel && !done) {
+                bool line_empty = true;
+                for (;;) {
+                    if (s_client->available()) {
+                        char c = s_client->read();
+                        idle = millis();
+                        if (c == '\n') break;
+                        if (c != '\r') line_empty = false;
+                    } else if (!s_client->connected() || millis() - idle > 5000) {
+                        done = true; break;
+                    } else { delay(1); }
+                }
+                if (line_empty) done = true;
+            }
+            break;
+        }
 
         if (out + chunk_size > cap) {
             dbg("Chunked: body exceeds buffer");
@@ -305,7 +357,7 @@ static void block_host(const char *url) {
     strncpy(s_blocked[s_blocked_next], host, sizeof(s_blocked[0]) - 1);
     s_blocked[s_blocked_next][sizeof(s_blocked[0]) - 1] = '\0';
     s_blocked_next = (s_blocked_next + 1) % BLOCKED_MAX;
-    dbg("Direct blocked: %s — using proxy from now on", host);
+    dbg("Direct blocked: %s - using proxy from now on", host);
 }
 
 static int do_request(const char *url, const char *post_body, size_t *total_out) {
@@ -344,14 +396,18 @@ static int do_request(const char *url, const char *post_body, size_t *total_out)
             "%s",
             path, host, cookie_hdr, strlen(post_body), post_body);
     } else {
-        // Direct origin connection: path only, no proxy auth
+        // Direct origin connection: path only, no proxy auth.
+        // No Sec-Fetch-* or sec-ch-ua: those are Chrome-exclusive but we send
+        // Accept-Encoding: identity (can't decompress), making the combination a
+        // detectable bot fingerprint.  Simpler headers are less inconsistent.
         req_len = snprintf(req, sizeof(req),
             "GET %s HTTP/1.1\r\n"
             "Host: %s\r\n"
-            "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36\r\n"
-            "Accept: text/html,application/xhtml+xml;q=0.9,*/*;q=0.8\r\n"
-            "Accept-Language: en-US,en;q=0.5\r\n"
+            "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36\r\n"
+            "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8\r\n"
+            "Accept-Language: en-GB,en;q=0.9\r\n"
             "Accept-Encoding: identity\r\n"
+            "Upgrade-Insecure-Requests: 1\r\n"
             "%s"
             "Connection: keep-alive\r\n\r\n",
             path, host, cookie_hdr);
@@ -405,9 +461,11 @@ static int do_request(const char *url, const char *post_body, size_t *total_out)
     if (hdr_len > 12) sscanf(fetch_buf, "HTTP/%*d.%*d %d", &status);
     dbg("HTTP %d (headers %zu bytes, %lums)", status, hdr_len, millis() - t0);
 
-    // Parse Set-Cookie headers and store cookies for this host
-    {
-        char req_host[128] = {};
+    // Parse Set-Cookie headers and store cookies for this host.
+    // Only for 2xx/3xx: error responses (especially 403) contain bot-detection
+    // trap cookies that prove we're not running JavaScript if echoed back.
+    if (status >= 200 && status < 400) {
+    char req_host[128] = {};
         const char *dummy;
         parse_url(url, req_host, sizeof(req_host), &dummy);
         char *pos = fetch_buf;
@@ -433,11 +491,12 @@ static int do_request(const char *url, const char *post_body, size_t *total_out)
                 dbg("Cookie [%s]: %s", req_host, nv);
             }
         }
-    }
+    }  // end cookie storage
 
-    // Parse Content-Length and Transfer-Encoding from headers
+    // Parse Content-Length, Transfer-Encoding, and Connection from headers
     long content_length = -1;
     bool chunked = false;
+    bool connection_close = false;
     {
         char *cl = strcasestr(fetch_buf, "\r\nContent-Length:");
         if (cl) {
@@ -450,6 +509,12 @@ static int do_request(const char *url, const char *post_body, size_t *total_out)
             te += 20;
             while (*te == ' ') te++;
             if (strncasecmp(te, "chunked", 7) == 0) chunked = true;
+        }
+        char *ch = strcasestr(fetch_buf, "\r\nConnection:");
+        if (ch) {
+            ch += 13;
+            while (*ch == ' ') ch++;
+            if (strncasecmp(ch, "close", 5) == 0) connection_close = true;
         }
     }
 
@@ -523,6 +588,7 @@ static int do_request(const char *url, const char *post_body, size_t *total_out)
         if (content_length >= 0) {
             dbg("Reading %ld bytes (Content-Length)", content_length);
             body_bytes = read_exact(hdr_len, (size_t)content_length);
+            if (body_bytes < (size_t)content_length) connection_close = true;  // partial read
         } else if (chunked) {
             dbg("Reading chunked body");
             int cb = read_chunked_body(hdr_len);
@@ -530,9 +596,12 @@ static int do_request(const char *url, const char *post_body, size_t *total_out)
             body_bytes = (size_t)cb;
         } else {
             // No Content-Length, not chunked — read until close (connection won't be reusable)
-            dbg("No Content-Length/chunked — reading until close");
+            dbg("No Content-Length/chunked - reading until close");
             body_bytes = read_until_close(hdr_len);
+            connection_close = true;  // can't reuse regardless of Connection header
         }
+        // Stop the socket now if the server won't reuse it — prevents stale-data reuse
+        if (connection_close) s_client->stop();
         *total_out = hdr_len + body_bytes;
         fetch_buf[*total_out] = '\0';
         dbg("Body: %zu bytes in %lums", body_bytes, millis() - t0);
@@ -564,17 +633,17 @@ static bool ensure_direct(const char *url) {
     }
     close_client();
 
-    s_client = new WiFiClientSecure();
-    s_client->setInsecure();
-    s_client->setTimeout(10);
+    BrowserTLSClient *bc = new BrowserTLSClient();
+    bc->setInsecure();
+    bc->setTimeout(10);
     dbg("Direct TLS connect %s:443...", host);
     uint32_t t0 = millis();
-    if (!s_client->connect(host, 443)) {
+    if (!bc->connectWithChromeCiphers(host, 443)) {
         dbg("Direct connect FAIL after %lums", millis() - t0);
-        delete s_client;
-        s_client = nullptr;
+        delete bc;
         return false;
     }
+    s_client = bc;
     s_conn_type = CONN_DIRECT;
     strncpy(s_direct_host, host, sizeof(s_direct_host) - 1);
     s_direct_host[sizeof(s_direct_host) - 1] = '\0';
@@ -714,7 +783,8 @@ static int fetch_impl(const char *url, const char *post_body, char **buf_out) {
             if (status == 0 || total == 0) {
                 if (attempt == 0) {
                     dbg("Direct: reconnecting after failure...");
-                    continue;  // stale keep-alive — one retry with a fresh socket
+                    close_client();  // drop stale socket before retry
+                    continue;
                 }
                 block_host(cur_url);
                 break;
@@ -754,21 +824,29 @@ static int fetch_impl(const char *url, const char *post_body, char **buf_out) {
                 continue;
             }
 
-            dbg("Direct HTTP %d — falling back to proxy", status);
-            block_host(cur_url);
-            break;
+            // 403/429/503 are bot-blocking codes — proxy may succeed
+            if (status == 403 || status == 429 || status == 503) {
+                dbg("Direct HTTP %d - using proxy", status);
+                block_host(cur_url);
+                break;
+            }
+            // Any other error (404, 4xx, 5xx): the URL or server is the problem,
+            // not our TLS fingerprint — proxy would return the same thing
+            dbg("Direct HTTP %d", status);
+            close_client();
+            return -1;
         }
         if (s_cancel) return -1;
     }
 
-    // If the direct loop landed on http:// (e.g. argos redirects https→http), upgrade back
-    // to https before handing off — Akamai/Cloudflare block plain-HTTP proxy requests
-    if (strncmp(cur_url, "http://", 7) == 0) {
+    // If the direct loop was redirected from https->http, upgrade back for proxy.
+    // Only do this when the original URL was https — plain-http sites stay plain-http.
+    if (strncmp(cur_url, "http://", 7) == 0 && strncmp(url, "https://", 8) == 0) {
         char tmp[512];
         snprintf(tmp, sizeof(tmp), "https://%s", cur_url + 7);
         strncpy(cur_url, tmp, sizeof(cur_url) - 1);
         cur_url[sizeof(cur_url) - 1] = '\0';
-        dbg("Upgraded http→https for proxy: %.60s", cur_url);
+        dbg("Upgraded http->https for proxy: %.60s", cur_url);
     }
 
     // PHP proxy fallback for GET — silent retry once before reporting failure.
@@ -786,6 +864,7 @@ static int fetch_impl(const char *url, const char *post_body, char **buf_out) {
                 }
             }
             close_client();
+            if (php_status != 0) break;  // only retry on network failure, not HTTP errors
         }
         dbg("PHP proxy failed (status=%d)", php_status);
     }
@@ -832,7 +911,7 @@ static int fetch_impl(const char *url, const char *post_body, char **buf_out) {
             int status = do_php_request(cur_url, &total);
             if (!s_cancel && status >= 200 && status < 300 && total > 0) {
                 int body_len = extract_body(total);
-                if (body_len >= 0) { dbg("POST→GET PHP OK: %d bytes", body_len); return body_len; }
+                if (body_len >= 0) { dbg("POST->GET PHP OK: %d bytes", body_len); return body_len; }
             }
         }
     }

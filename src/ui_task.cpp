@@ -114,6 +114,7 @@ static void update_nav_buttons() {
 
 // Load a URL without modifying history — used by back/forward/retry
 static void load_url(const char *url) {
+    boot_menu_hide_buttons();
     bool aichat = strstr(url, AICHAT_URL) != nullptr;
     header_set_url(aichat ? "" : url);
     update_nav_buttons();
@@ -719,6 +720,7 @@ static void ui_task_fn(void *arg) {
                 strncpy(req.url, full_url, sizeof(req.url) - 1);
                 req.full_size = true;
                 img_task_post(&req);
+                page_img_full_posted();
             }
         }
 

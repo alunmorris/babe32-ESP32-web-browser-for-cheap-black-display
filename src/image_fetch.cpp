@@ -307,8 +307,26 @@ uint8_t *image_fetch_full(const char *img_url, size_t *out_len) {
             char full_url[768];
             if (wikimedia_thumb_to_full(img_url, full_url, sizeof(full_url))) {
                 dbg("img_full: %dx%d < screen, fetching full: %.50s", img_w, img_h, full_url);
-                heap_caps_free(r);
-                r = fetch_resized(full_url, out_len, IMAGE_FULL_W, IMAGE_FULL_H, 80, 512 * 1024);
+                size_t full_len = 0;
+                uint8_t *full_r = fetch_resized(full_url, &full_len, IMAGE_FULL_W, IMAGE_FULL_H, 80, 512 * 1024);
+                if (full_r && full_len > 0) {
+                    int full_w = 0, full_h = 0;
+                    bool bigger = get_image_dims(full_r, full_len, &full_w, &full_h) &&
+                                  (full_w > img_w || full_h > img_h);
+                    if (bigger) {
+                        heap_caps_free(r);
+                        r = full_r;
+                        *out_len = full_len;
+                    } else {
+                        dbg("img_full: full %dx%d not bigger, keeping thumbnail", full_w, full_h);
+                        heap_caps_free(full_r);
+                        // *out_len already holds thumbnail size from first fetch
+                    }
+                } else {
+                    if (full_r) heap_caps_free(full_r);
+                    dbg("img_full: full fetch failed, keeping thumbnail");
+                    // *out_len already holds thumbnail size from first fetch
+                }
             } else {
                 dbg("img_full: source %dx%d is genuinely small", img_w, img_h);
             }

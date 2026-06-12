@@ -252,7 +252,33 @@ static void decode_entities_once(char *s) {
             }
             else                                    { *w++ = *r++; }
         } else {
-            *w++ = *r++;
+            uint8_t c = (uint8_t)*r;
+            if (c >= 0x80) {
+                // Decode UTF-8 multibyte sequence and map to ASCII
+                uint32_t cp = 0;
+                int bytes = 0;
+                if      (c >= 0xF0) { cp = c & 0x07; bytes = 4; }
+                else if (c >= 0xE0) { cp = c & 0x0F; bytes = 3; }
+                else                { cp = c & 0x1F; bytes = 2; }
+                const char *end = r + bytes;
+                r++;
+                while (r < end && ((uint8_t)*r & 0xC0) == 0x80)
+                    cp = (cp << 6) | ((uint8_t)*r++ & 0x3F);
+                char mapped = 0;
+                switch (cp) {
+                    case 0x2018: case 0x2019: case 0x201A: mapped = '\''; break;
+                    case 0x201C: case 0x201D: case 0x201E: mapped = '"';  break;
+                    case 0x2013: case 0x2014: mapped = '-';  break;
+                    case 0x2022: mapped = '*';  break;
+                    case 0x00A0: mapped = ' ';  break;
+                    case 0x00A9: mapped = 'c';  break;
+                    case 0x00AE: mapped = 'R';  break;
+                    default: break;
+                }
+                if (mapped) *w++ = mapped;
+            } else {
+                *w++ = *r++;
+            }
         }
     }
     *w = '\0';

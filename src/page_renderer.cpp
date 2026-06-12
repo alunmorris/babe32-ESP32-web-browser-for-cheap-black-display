@@ -63,6 +63,7 @@ static lv_obj_t    *s_overlay = nullptr;
 static lv_img_dsc_t s_full_dsc;
 static uint8_t     *s_full_data = nullptr;
 static const char  *s_full_pending_url = nullptr;  // set by click, cleared by main loop
+static bool         s_full_fetching    = false;    // true from post until result arrives
 
 static void overlay_close_cb(lv_event_t *e) {
     if (s_overlay) {
@@ -74,6 +75,7 @@ static void overlay_close_cb(lv_event_t *e) {
         s_full_data = nullptr;
     }
     s_full_pending_url = nullptr;
+    s_full_fetching    = false;
 }
 
 static void create_overlay_base() {
@@ -92,7 +94,7 @@ static void create_overlay_base() {
 
 static void img_click_cb(lv_event_t *e) {
     const char *url = (const char *)lv_event_get_user_data(e);
-    if (!url || s_full_pending_url) return;  // ignore if already fetching
+    if (!url || s_full_pending_url || s_full_fetching) return;  // ignore if already fetching
 
     s_full_pending_url = url;
 
@@ -500,8 +502,13 @@ bool page_img_full_pending(const char **url) {
     return false;
 }
 
+void page_img_full_posted() {
+    s_full_fetching = true;
+}
+
 void page_img_full_set(uint8_t *data, size_t len) {
     s_full_pending_url = nullptr;
+    s_full_fetching    = false;
     if (!data || len == 0 || !s_overlay) return;
 
     if (s_full_data) heap_caps_free(s_full_data);
@@ -543,6 +550,7 @@ void page_img_full_set(uint8_t *data, size_t len) {
 
 void page_img_full_fail() {
     s_full_pending_url = nullptr;
+    s_full_fetching    = false;
     if (!s_overlay) return;
 
     // Replace loading text with error

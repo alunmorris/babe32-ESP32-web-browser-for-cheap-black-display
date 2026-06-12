@@ -4,6 +4,7 @@
  * 190326 New from Claude Code Babe32 project
  * 120626 Browser UA, forward origin HTTP status, token auth
  * 120626 Brightdata residential proxy fallback for blocked sites
+ * 120626 Full Chrome 120 header set; CURLOPT_ENCODING for auto-decompress
 */
 
   require_once __DIR__ . '/babe32proxy_secrets.php';
@@ -20,10 +21,19 @@
           CURLOPT_FOLLOWLOCATION => true,
           CURLOPT_MAXREDIRS      => 5,
           CURLOPT_USERAGENT      => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          CURLOPT_ENCODING       => '',   // auto Accept-Encoding + transparent decompress
           CURLOPT_HTTPHEADER     => [
-              'Accept: text/html,application/xhtml+xml;q=0.9,*/*;q=0.8',
-              'Accept-Language: en-US,en;q=0.5',
-              'Accept-Encoding: identity',
+              'Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
+              'Accept-Language: en-GB,en;q=0.9',
+              'Upgrade-Insecure-Requests: 1',
+              'Sec-Fetch-Dest: document',
+              'Sec-Fetch-Mode: navigate',
+              'Sec-Fetch-Site: none',
+              'Sec-Fetch-User: ?1',
+              'sec-ch-ua: "Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"',
+              'sec-ch-ua-mobile: ?0',
+              'sec-ch-ua-platform: "Windows"',
+              'Cache-Control: max-age=0',
           ],
           CURLOPT_TIMEOUT        => 15,
           CURLOPT_SSL_VERIFYPEER => false,

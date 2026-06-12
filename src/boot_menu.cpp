@@ -59,7 +59,7 @@ lv_obj_t *boot_menu_get_wiki_ta() {
     return s_wiki_ta;
 }
 
-static void hide_boot_buttons() {
+void boot_menu_hide_buttons() {
     if (s_inv_btn)  { lv_obj_del(s_inv_btn);  s_inv_btn  = nullptr; }
     if (s_wifi_btn) { lv_obj_del(s_wifi_btn); s_wifi_btn = nullptr; }
     if (s_off_btn)  { lv_obj_del(s_off_btn);  s_off_btn  = nullptr; }
@@ -69,7 +69,7 @@ static void hide_boot_buttons() {
 static void menu_item_cb(lv_event_t *e) {
     int idx = (int)(intptr_t)lv_event_get_user_data(e);
     if (idx >= 0 && idx < s_menu_count) {
-        hide_boot_buttons();
+        boot_menu_hide_buttons();
         const char *label = s_menu[idx].label;
         if (strcmp(label, "Search") == 0 || strcmp(label, "Wikipedia") == 0)
             if (s_urls_cb) s_urls_cb();
@@ -157,7 +157,7 @@ void show_wiki_search() {
 }
 
 static void wifi_setup_btn_cb(lv_event_t *e) {
-    hide_boot_buttons();
+    boot_menu_hide_buttons();
     wifi_setup_show();
 }
 

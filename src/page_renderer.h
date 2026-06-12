@@ -45,5 +45,6 @@ void page_img_set(int index, uint8_t *data, size_t len);
 
 // Full-size image overlay (async) — check from main loop
 bool page_img_full_pending(const char **url);
+void page_img_full_posted();   // call after posting the request to img_task
 void page_img_full_set(uint8_t *data, size_t len);
 void page_img_full_fail();

@@ -13,6 +13,7 @@ typedef void (*urls_mode_cb_t)();
 
 void boot_menu_init(lv_obj_t *content, navigate_cb_t nav,
                     field_focus_cb_t focus, urls_mode_cb_t urls_mode);
+void boot_menu_hide_buttons();
 void show_boot_menu();
 void show_wiki_search();
 void boot_menu_wiki_submit();
