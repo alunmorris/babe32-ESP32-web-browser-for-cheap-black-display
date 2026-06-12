@@ -38,3 +38,6 @@ void header_set_wifi_rssi(int rssi);
 
 // Move WiFi icon to foreground — call once after all screen widgets are created
 void header_wifi_foreground();
+
+// Height of the header bar in pixels — used to position content below it
+#define HEADER_HEIGHT 30

@@ -392,7 +392,7 @@ static void kb_show() {
     lv_obj_add_flag(s_show_btn, LV_OBJ_FLAG_HIDDEN);
     if (s_url_btn) lv_obj_add_flag(s_url_btn, LV_OBJ_FLAG_HIDDEN);
     if (s_img_btn) lv_obj_add_flag(s_img_btn, LV_OBJ_FLAG_HIDDEN);
-    lv_obj_set_height(s_content, LV_VER_RES - 30 - KB_HEIGHT);
+    lv_obj_set_height(s_content, LV_VER_RES - HEADER_HEIGHT - KB_HEIGHT);
     lv_obj_t *ta = header_get_url_ta();
     lv_keyboard_set_textarea(s_kb, ta);
     lv_textarea_set_cursor_pos(ta, LV_TEXTAREA_CURSOR_LAST);
@@ -428,8 +428,8 @@ void ui_build_root() {
 
     // Content area
     s_content = lv_obj_create(scr);
-    lv_obj_set_size(s_content, LV_HOR_RES, LV_VER_RES - 30);
-    lv_obj_set_pos(s_content, 0, 30);
+    lv_obj_set_size(s_content, LV_HOR_RES, LV_VER_RES - HEADER_HEIGHT);
+    lv_obj_set_pos(s_content, 0, HEADER_HEIGHT);
     lv_obj_set_style_bg_color(s_content, lv_color_hex(0x1A1A2E), 0);
     lv_obj_set_style_border_width(s_content, 0, 0);
     lv_obj_set_style_radius(s_content, 0, 0);
@@ -652,8 +652,8 @@ static void ui_task_fn(void *arg) {
                 // AI chat mode: hide header, use full height, scroll to bottom
                 bool is_aichat = strstr(s_pending_url, AICHAT_URL) != nullptr;
                 header_set_visible(!is_aichat);
-                lv_obj_set_pos(s_content, 0, is_aichat ? 0 : 30);
-                lv_obj_set_height(s_content, is_aichat ? LV_VER_RES : LV_VER_RES - 30);
+                lv_obj_set_pos(s_content, 0, is_aichat ? 0 : HEADER_HEIGHT);
+                lv_obj_set_height(s_content, is_aichat ? LV_VER_RES : LV_VER_RES - HEADER_HEIGHT);
                 // Floating Home button for AI Chat (no header)
                 if (is_aichat) {
                     if (!s_aichat_home) {

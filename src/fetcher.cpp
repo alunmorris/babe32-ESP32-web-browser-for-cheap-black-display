@@ -191,7 +191,7 @@ static size_t read_exact(size_t offset, size_t len) {
             got += s_client->readBytes(fetch_buf + offset + got, want);
             g_fetch_kb = (int)((offset + got) / 1024);
             idle = millis();
-        } else if (millis() - idle > 10000) {
+        } else if (millis() - idle > NET_IO_TIMEOUT_MS) {
             dbg("Read timeout at %zu/%zu", got, len);
             break;
         } else {
@@ -212,7 +212,7 @@ static size_t read_until_close(size_t offset) {
             total += s_client->readBytes(fetch_buf + offset + total, min((size_t)av, cap - total));
             g_fetch_kb = (int)((offset + total) / 1024);
             idle = millis();
-        } else if (millis() - idle > 10000) {
+        } else if (millis() - idle > NET_IO_TIMEOUT_MS) {
             dbg("Read timeout");
             break;
         } else {
@@ -242,7 +242,7 @@ static int read_chunked_body(size_t body_start) {
                 if (c != '\r') line[li++] = c;
             } else if (!s_client->connected()) {
                 break;
-            } else if (millis() - idle > 10000) {
+            } else if (millis() - idle > NET_IO_TIMEOUT_MS) {
                 dbg("Chunked: timeout reading size");
                 return (int)(out - body_start);  // return partial on timeout
             } else {
@@ -265,7 +265,7 @@ static int read_chunked_body(size_t body_start) {
                         idle = millis();
                         if (c == '\n') break;
                         if (c != '\r') line_empty = false;
-                    } else if (!s_client->connected() || millis() - idle > 5000) {
+                    } else if (!s_client->connected() || millis() - idle > NET_DRAIN_TIMEOUT_MS) {
                         done = true; break;
                     } else { delay(1); }
                 }
@@ -428,7 +428,7 @@ static int do_request(const char *url, const char *post_body, size_t *total_out)
     size_t cap = FETCH_BUF_SIZE - 1;
     uint32_t idle = millis();
     bool found_end = false;
-    while (hdr_len < cap && hdr_len < 8192 && !s_cancel) {
+    while (hdr_len < cap && hdr_len < NET_HEADER_MAX_BYTES && !s_cancel) {
         if (s_client->available()) {
             fetch_buf[hdr_len] = s_client->read();
             hdr_len++;
@@ -441,7 +441,7 @@ static int do_request(const char *url, const char *post_body, size_t *total_out)
             }
         } else if (!s_client->connected()) {
             break;
-        } else if (millis() - idle > 10000) {
+        } else if (millis() - idle > NET_IO_TIMEOUT_MS) {
             dbg("Header read timeout");
             break;
         } else {
@@ -458,13 +458,13 @@ static int do_request(const char *url, const char *post_body, size_t *total_out)
 
     // Parse status
     int status = 0;
-    if (hdr_len > 12) sscanf(fetch_buf, "HTTP/%*d.%*d %d", &status);
+    if (hdr_len > HTTP_STATUS_LINE_MIN) sscanf(fetch_buf, "HTTP/%*d.%*d %d", &status);
     dbg("HTTP %d (headers %zu bytes, %lums)", status, hdr_len, millis() - t0);
 
     // Parse Set-Cookie headers and store cookies for this host.
     // Only for 2xx/3xx: error responses (especially 403) contain bot-detection
     // trap cookies that prove we're not running JavaScript if echoed back.
-    if (status >= 200 && status < 400) {
+    if (status >= HTTP_OK && status < HTTP_4XX_START) {
     char req_host[128] = {};
         const char *dummy;
         parse_url(url, req_host, sizeof(req_host), &dummy);
@@ -519,7 +519,7 @@ static int do_request(const char *url, const char *post_body, size_t *total_out)
     }
 
     // For redirects, we need headers in fetch_buf — read body but we only need the headers
-    if (status >= 301 && status <= 308) {
+    if (status >= HTTP_REDIRECT_MIN && status <= HTTP_REDIRECT_MAX) {
         // Drain body so connection stays clean for reuse
         if (content_length > 0) {
             // Read and discard body
@@ -533,7 +533,7 @@ static int do_request(const char *url, const char *post_body, size_t *total_out)
                     size_t want = min((size_t)av, min(sizeof(discard), to_drain - drained));
                     drained += s_client->readBytes(discard, want);
                     drain_idle = millis();
-                } else if (millis() - drain_idle > 5000) {
+                } else if (millis() - drain_idle > NET_DRAIN_TIMEOUT_MS) {
                     break;
                 } else {
                     delay(1);
@@ -552,7 +552,7 @@ static int do_request(const char *url, const char *post_body, size_t *total_out)
                         ci = millis();
                         if (c == '\n') break;
                         if (c != '\r') line[li++] = c;
-                    } else if (!s_client->connected() || millis() - ci > 5000) {
+                    } else if (!s_client->connected() || millis() - ci > NET_DRAIN_TIMEOUT_MS) {
                         goto drain_done;
                     } else {
                         delay(1);
@@ -582,8 +582,8 @@ static int do_request(const char *url, const char *post_body, size_t *total_out)
         return status;
     }
 
-    // For 200 responses, read body into fetch_buf after headers
-    if (status >= 200 && status < 300) {
+    // For 2xx responses, read body into fetch_buf after headers
+    if (status >= HTTP_OK && status < HTTP_3XX_START) {
         size_t body_bytes = 0;
         if (content_length >= 0) {
             dbg("Reading %ld bytes (Content-Length)", content_length);
@@ -638,7 +638,7 @@ static bool ensure_direct(const char *url) {
     bc->setTimeout(10);
     dbg("Direct TLS connect %s:443...", host);
     uint32_t t0 = millis();
-    if (!bc->connectWithChromeCiphers(host, 443)) {
+    if (!bc->connectWithChromeCiphers(host, HTTPS_PORT)) {
         dbg("Direct connect FAIL after %lums", millis() - t0);
         delete bc;
         return false;
@@ -681,7 +681,7 @@ static int do_php_request(const char *url, size_t *total_out) {
     size_t cap = FETCH_BUF_SIZE - 1;
     uint32_t idle = millis();
     bool found_end = false;
-    while (hdr_len < cap && hdr_len < 8192 && !s_cancel) {
+    while (hdr_len < cap && hdr_len < NET_HEADER_MAX_BYTES && !s_cancel) {
         if (s_client->available()) {
             fetch_buf[hdr_len] = s_client->read();
             hdr_len++;
@@ -694,7 +694,7 @@ static int do_php_request(const char *url, size_t *total_out) {
             }
         } else if (!s_client->connected()) {
             break;
-        } else if (millis() - idle > 10000) {
+        } else if (millis() - idle > NET_IO_TIMEOUT_MS) {
             dbg("PHP header timeout");
             break;
         } else {
@@ -704,7 +704,7 @@ static int do_php_request(const char *url, size_t *total_out) {
     fetch_buf[hdr_len] = '\0';
 
     int status = 0;
-    if (found_end && hdr_len > 12)
+    if (found_end && hdr_len > HTTP_STATUS_LINE_MIN)
         sscanf(fetch_buf, "HTTP/%*d.%*d %d", &status);
     dbg("PHP HTTP %d (%zu hdr, %lums)", status, hdr_len, millis() - t0);
 
@@ -721,7 +721,7 @@ static int do_php_request(const char *url, size_t *total_out) {
         if (te) { te += 20; while (*te == ' ') te++; if (strncasecmp(te, "chunked", 7) == 0) chunked = true; }
     }
 
-    if (status >= 200 && status < 300) {
+    if (status >= HTTP_OK && status < HTTP_3XX_START) {
         size_t body_bytes = 0;
         if (content_length >= 0) {
             body_bytes = read_exact(hdr_len, (size_t)content_length);
@@ -790,7 +790,7 @@ static int fetch_impl(const char *url, const char *post_body, char **buf_out) {
                 break;
             }
 
-            if (status >= 200 && status < 300) {
+            if (status >= HTTP_OK && status < HTTP_3XX_START) {
                 int body_len = extract_body(total);
                 if (body_len >= 0) {
                     dbg("Direct OK: %d bytes", body_len);
@@ -800,7 +800,7 @@ static int fetch_impl(const char *url, const char *post_body, char **buf_out) {
                 break;  // malformed response — let the proxy try
             }
 
-            if (status >= 301 && status <= 308) {
+            if (status >= HTTP_REDIRECT_MIN && status <= HTTP_REDIRECT_MAX) {
                 char *loc = strcasestr(fetch_buf, "\r\nLocation:");
                 if (!loc) { close_client(); break; }
                 loc += 11;
@@ -825,7 +825,7 @@ static int fetch_impl(const char *url, const char *post_body, char **buf_out) {
             }
 
             // 403/429/503 are bot-blocking codes — proxy may succeed
-            if (status == 403 || status == 429 || status == 503) {
+            if (status == HTTP_FORBIDDEN || status == HTTP_TOO_MANY_REQS || status == HTTP_UNAVAILABLE) {
                 dbg("Direct HTTP %d - using proxy", status);
                 block_host(cur_url);
                 break;
@@ -856,7 +856,7 @@ static int fetch_impl(const char *url, const char *post_body, char **buf_out) {
             if (!ensure_php_connected()) break;
             size_t total = 0;
             php_status = do_php_request(cur_url, &total);
-            if (!s_cancel && php_status >= 200 && php_status < 300 && total > 0) {
+            if (!s_cancel && php_status >= HTTP_OK && php_status < HTTP_3XX_START && total > 0) {
                 int body_len = extract_body(total);
                 if (body_len >= 0) {
                     dbg("PHP proxy OK: %d bytes", body_len);
@@ -881,11 +881,11 @@ static int fetch_impl(const char *url, const char *post_body, char **buf_out) {
             close_client();  // POST uses Connection: close
             if (s_cancel) return salvage_partial(total);
             if (status == 0 || total == 0) { dbg("POST: no response"); continue; }
-            if (status >= 200 && status < 300) {
+            if (status >= HTTP_OK && status < HTTP_3XX_START) {
                 int body_len = extract_body(total);
                 if (body_len >= 0) { dbg("POST OK: %d bytes", body_len); return body_len; }
             }
-            if (status >= 301 && status <= 308) {
+            if (status >= HTTP_REDIRECT_MIN && status <= HTTP_REDIRECT_MAX) {
                 char *loc = strcasestr(fetch_buf, "\r\nLocation:");
                 if (!loc) return -1;
                 loc += 11; while (*loc == ' ') loc++;
@@ -909,7 +909,7 @@ static int fetch_impl(const char *url, const char *post_body, char **buf_out) {
         if (ensure_php_connected()) {
             size_t total = 0;
             int status = do_php_request(cur_url, &total);
-            if (!s_cancel && status >= 200 && status < 300 && total > 0) {
+            if (!s_cancel && status >= HTTP_OK && status < HTTP_3XX_START && total > 0) {
                 int body_len = extract_body(total);
                 if (body_len >= 0) { dbg("POST->GET PHP OK: %d bytes", body_len); return body_len; }
             }

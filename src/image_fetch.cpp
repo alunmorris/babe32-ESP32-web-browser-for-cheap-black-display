@@ -7,6 +7,7 @@
  * 100626 If resized image < screen, transform Wikimedia URL and re-fetch via proxy
  */
 #include "image_fetch.h"
+#include "fetcher.h"
 #include "url_utils.h"
 #include "dbglog.h"
 #include <Arduino.h>
@@ -86,7 +87,7 @@ static bool ensure_connected() {
     s_img_client->setTimeout(10);
 
     dbg("img_fetch: connecting to webmashing.com...");
-    if (!s_img_client->connect("webmashing.com", 443)) {
+    if (!s_img_client->connect("webmashing.com", HTTPS_PORT)) {
         dbg("img_fetch: connect failed");
         delete s_img_client;
         s_img_client = nullptr;
@@ -125,7 +126,7 @@ static uint8_t *fetch_resized(const char *img_url, size_t *out_len,
     size_t hdr_len = 0;
     uint32_t idle = millis();
     bool found_end = false;
-    while (hdr_len < sizeof(hdr_buf) - 1 && millis() - idle < 10000) {
+    while (hdr_len < sizeof(hdr_buf) - 1 && millis() - idle < NET_IO_TIMEOUT_MS) {
         if (s_img_client->available()) {
             hdr_buf[hdr_len++] = s_img_client->read();
             idle = millis();
@@ -151,8 +152,8 @@ static uint8_t *fetch_resized(const char *img_url, size_t *out_len,
 
     // Parse status
     int status = 0;
-    if (hdr_len > 12) sscanf(hdr_buf, "HTTP/%*d.%*d %d", &status);
-    if (status != 200) {
+    if (hdr_len > HTTP_STATUS_LINE_MIN) sscanf(hdr_buf, "HTTP/%*d.%*d %d", &status);
+    if (status != HTTP_OK) {
         dbg("img_fetch: HTTP %d", status);
         s_img_client->stop();
         return nullptr;
@@ -195,11 +196,11 @@ static uint8_t *fetch_resized(const char *img_url, size_t *out_len,
     idle = millis();
     if (chunked) {
         // Chunked: read chunk-size\r\n...data...\r\n until 0\r\n
-        while (total < max_size && millis() - idle < 15000) {
+        while (total < max_size && millis() - idle < IMG_BODY_TIMEOUT_MS) {
             // Read chunk size line
             char line[16];
             size_t li = 0;
-            while (li < sizeof(line) - 1 && millis() - idle < 15000) {
+            while (li < sizeof(line) - 1 && millis() - idle < IMG_BODY_TIMEOUT_MS) {
                 if (s_img_client->available()) {
                     char c = s_img_client->read();
                     idle = millis();
@@ -217,7 +218,7 @@ static uint8_t *fetch_resized(const char *img_url, size_t *out_len,
 
             // Read chunk data
             size_t chunk_read = 0;
-            while (chunk_read < chunk_sz && total < max_size && millis() - idle < 15000) {
+            while (chunk_read < chunk_sz && total < max_size && millis() - idle < IMG_BODY_TIMEOUT_MS) {
                 int av = s_img_client->available();
                 if (av > 0) {
                     size_t want = chunk_sz - chunk_read;
@@ -235,7 +236,7 @@ static uint8_t *fetch_resized(const char *img_url, size_t *out_len,
             }
             // Skip trailing \r\n after chunk data
             int skip = 0;
-            while (skip < 2 && millis() - idle < 15000) {
+            while (skip < 2 && millis() - idle < IMG_BODY_TIMEOUT_MS) {
                 if (s_img_client->available()) {
                     s_img_client->read();
                     skip++;
@@ -248,7 +249,7 @@ static uint8_t *fetch_resized(const char *img_url, size_t *out_len,
             }
         }
     } else {
-        while (total < max_size && millis() - idle < 15000) {
+        while (total < max_size && millis() - idle < IMG_BODY_TIMEOUT_MS) {
             int av = s_img_client->available();
             if (av > 0) {
                 size_t want = (size_t)av;
@@ -286,7 +287,7 @@ uint8_t *image_fetch(const char *img_url, size_t *out_len) {
     img_mutex_init();
     xSemaphoreTake(s_img_mutex, portMAX_DELAY);
     uint8_t *r = fetch_resized(img_url, out_len,
-                         IMAGE_THUMB_W, IMAGE_THUMB_H, 50, 128 * 1024);
+                         IMAGE_THUMB_W, IMAGE_THUMB_H, IMAGE_THUMB_QUALITY, IMAGE_THUMB_MAX_BYTES);
     xSemaphoreGive(s_img_mutex);
     return r;
 }
@@ -294,7 +295,7 @@ uint8_t *image_fetch(const char *img_url, size_t *out_len) {
 uint8_t *image_fetch_full(const char *img_url, size_t *out_len) {
     img_mutex_init();
     xSemaphoreTake(s_img_mutex, portMAX_DELAY);
-    uint8_t *r = fetch_resized(img_url, out_len, IMAGE_FULL_W, IMAGE_FULL_H, 80, 512 * 1024);
+    uint8_t *r = fetch_resized(img_url, out_len, IMAGE_FULL_W, IMAGE_FULL_H, IMAGE_FULL_QUALITY, IMAGE_FULL_MAX_BYTES);
 
     // If the proxy returned something smaller than the screen in both dimensions,
     // the img_url is itself a thumbnail. For Wikimedia, derive the full-resolution
@@ -308,7 +309,8 @@ uint8_t *image_fetch_full(const char *img_url, size_t *out_len) {
             if (wikimedia_thumb_to_full(img_url, full_url, sizeof(full_url))) {
                 dbg("img_full: %dx%d < screen, fetching full: %.50s", img_w, img_h, full_url);
                 size_t full_len = 0;
-                uint8_t *full_r = fetch_resized(full_url, &full_len, IMAGE_FULL_W, IMAGE_FULL_H, 80, 512 * 1024);
+                uint8_t *full_r = fetch_resized(full_url, &full_len,
+                                                 IMAGE_FULL_W, IMAGE_FULL_H, IMAGE_FULL_QUALITY, IMAGE_FULL_MAX_BYTES);
                 if (full_r && full_len > 0) {
                     int full_w = 0, full_h = 0;
                     bool bigger = get_image_dims(full_r, full_len, &full_w, &full_h) &&

@@ -14,6 +14,17 @@
 #define IMAGE_FULL_H  310
 #define IMAGE_PROXY "https://webmashing.com/image-resize.php"
 
+// JPEG quality (0-100) for each fetch mode
+#define IMAGE_THUMB_QUALITY   50
+#define IMAGE_FULL_QUALITY    80
+
+// Maximum response bytes per fetch
+#define IMAGE_THUMB_MAX_BYTES (128 * 1024)
+#define IMAGE_FULL_MAX_BYTES  (512 * 1024)
+
+// Body read timeout — longer than header timeout to allow large image transfers
+#define IMG_BODY_TIMEOUT_MS   15000
+
 // Fetch a resized image via proxy. Returns PSRAM-allocated buffer with
 // raw image file data (PNG/JPEG), or nullptr on failure.
 // *out_len receives the data length. Caller must free with heap_caps_free().

@@ -102,8 +102,8 @@ void boot_menu_wiki_submit() {
 void show_wiki_search() {
     if (!lvgl_lock(50)) return;
     header_set_visible(true);
-    lv_obj_set_pos(s_content, 0, 30);
-    lv_obj_set_height(s_content, LV_VER_RES - 30);
+    lv_obj_set_pos(s_content, 0, HEADER_HEIGHT);
+    lv_obj_set_height(s_content, LV_VER_RES - HEADER_HEIGHT);
     page_clear(s_content);
     lv_obj_add_flag(s_content, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_set_flex_flow(s_content, LV_FLEX_FLOW_COLUMN);
@@ -166,8 +166,8 @@ extern const lv_img_dsc_t babe32_img;
 void show_boot_menu() {
     if (!lvgl_lock(50)) return;
     header_set_visible(true);
-    lv_obj_set_pos(s_content, 0, 30);
-    lv_obj_set_height(s_content, LV_VER_RES - 30);
+    lv_obj_set_pos(s_content, 0, HEADER_HEIGHT);
+    lv_obj_set_height(s_content, LV_VER_RES - HEADER_HEIGHT);
     page_clear(s_content);
     s_wiki_ta = nullptr;
 
