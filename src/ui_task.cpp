@@ -104,6 +104,7 @@ static void on_home() {
         s_stop_rendered = true;
         header_set_loading(false);
     }
+    kb_hide();
     show_boot_menu();
 }
 static void aichat_home_cb(lv_event_t *e) {
