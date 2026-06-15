@@ -498,8 +498,8 @@ void ui_build_root() {
     // Main background
     lv_obj_set_style_bg_opa(s_kb, LV_OPA_COVER, 0);
     lv_obj_set_style_bg_color(s_kb, lv_color_hex(0x16213E), 0);
-    lv_obj_set_style_pad_all(s_kb, 2, 0);
-    lv_obj_set_style_pad_gap(s_kb, 2, 0);
+    lv_obj_set_style_pad_all(s_kb, 4, 0);
+    lv_obj_set_style_pad_gap(s_kb, 4, 0);
     // Keys — default
     lv_obj_set_style_bg_opa(s_kb, LV_OPA_COVER, LV_PART_ITEMS);
     lv_obj_set_style_bg_color(s_kb, lv_color_hex(0x0F3460), LV_PART_ITEMS);
