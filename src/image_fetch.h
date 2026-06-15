@@ -12,7 +12,6 @@
 #define IMAGE_THUMB_H 80
 #define IMAGE_FULL_W  480
 #define IMAGE_FULL_H  310
-#define IMAGE_PROXY "https://webmashing.com/image-resize.php"
 
 // JPEG quality (0-100) for each fetch mode
 #define IMAGE_THUMB_QUALITY   50

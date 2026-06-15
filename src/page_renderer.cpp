@@ -19,7 +19,6 @@ static bool s_inverted = false;
 #define COLOUR_TEXT    lv_color_hex(s_inverted ? 0x1A1A1A : 0xE0E0E0)
 #define COLOUR_HEADING lv_color_hex(s_inverted ? 0x000000 : 0xFFFFFF)
 #define COLOUR_LINK    lv_color_hex(s_inverted ? 0x0066CC : 0x4FC3F7)
-#define COLOUR_LINK_BG lv_color_hex(s_inverted ? 0xE0E8F0 : 0x16213E)
 #define COLOUR_FIELD   lv_color_hex(s_inverted ? 0xFFFFFF : 0x16213E)
 #define COLOUR_BORDER  lv_color_hex(s_inverted ? 0xCCCCCC : 0x0F3460)
 #define COLOUR_BTN_BG  lv_color_hex(s_inverted ? 0xE0E0E0 : 0x0F3460)

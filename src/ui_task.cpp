@@ -271,6 +271,16 @@ static void kb_sync_mode() {
     lv_keyboard_set_mode(s_kb, mode);
 }
 
+// Our custom function keys (SFT/ENT/scroll) carry a text label, so LVGL's
+// default handler types that label into the textarea before our callback runs.
+// Undo it by deleting one character per label byte.
+static void kb_undo_label_text(const char *label) {
+    lv_obj_t *ta = lv_keyboard_get_textarea(s_kb);
+    if (!ta) return;
+    for (size_t i = 0, n = strlen(label); i < n; i++)
+        lv_textarea_del_char(ta);
+}
+
 static void kb_value_changed_cb(lv_event_t *e) {
     uint16_t btn_id = lv_btnmatrix_get_selected_btn(s_kb);
     if (btn_id == LV_BTNMATRIX_BTN_NONE) return;
@@ -278,13 +288,8 @@ static void kb_value_changed_cb(lv_event_t *e) {
     if (!txt) return;
 
     if (strcmp(txt, "SFT") == 0) {
-        // LVGL typed "SFT" as text — delete it, toggle shift, sync mode
-        lv_obj_t *ta = lv_keyboard_get_textarea(s_kb);
-        if (ta) {
-            lv_textarea_del_char(ta);
-            lv_textarea_del_char(ta);
-            lv_textarea_del_char(ta);
-        }
+        // Toggle shift, then re-select the matching mode (LVGL ignores "SFT")
+        kb_undo_label_text(txt);
         s_kb_shifted = !s_kb_shifted;
         kb_sync_mode();
     } else if (strcmp(txt, "1#") == 0) {
@@ -292,20 +297,10 @@ static void kb_value_changed_cb(lv_event_t *e) {
         s_kb_numrow = !s_kb_numrow;
         kb_sync_mode();
     } else if (strcmp(txt, "ENT") == 0) {
-        // LVGL typed "ENT" as text — delete it and fire READY
-        lv_obj_t *ta = lv_keyboard_get_textarea(s_kb);
-        if (ta) {
-            lv_textarea_del_char(ta);
-            lv_textarea_del_char(ta);
-            lv_textarea_del_char(ta);
-        }
+        kb_undo_label_text(txt);
         lv_event_send(s_kb, LV_EVENT_READY, NULL);
     } else if (strcmp(txt, LV_SYMBOL_UP) == 0) {
-        lv_obj_t *ta = lv_keyboard_get_textarea(s_kb);
-        if (ta) {
-            size_t sym_len = strlen(LV_SYMBOL_UP);
-            for (size_t i = 0; i < sym_len; i++) lv_textarea_del_char(ta);
-        }
+        kb_undo_label_text(txt);
         lv_obj_scroll_to_y(s_content, 0, LV_ANIM_OFF);
     }
 }
@@ -491,7 +486,6 @@ void ui_build_root() {
     s_kb = lv_keyboard_create(scr);
     lv_obj_set_size(s_kb, LV_HOR_RES, KB_HEIGHT);
     lv_obj_align(s_kb, LV_ALIGN_BOTTOM_MID, 0, 0);
-    lv_obj_set_style_pad_gap(s_kb, 2, 0);
     // Remove theme — apply a bare style to all parts/states
     lv_obj_remove_style_all(s_kb);
     lv_obj_set_size(s_kb, LV_HOR_RES, KB_HEIGHT);
@@ -725,11 +719,9 @@ static void ui_task_fn(void *arg) {
             // Update loading KB counter once per second
             if (s_loading) {
                 static uint32_t last_kb_update = 0;
-                static int last_kb_val = -1;
                 int kb = g_fetch_kb;
                 if (millis() - last_kb_update > 500) {
                     last_kb_update = millis();
-                    last_kb_val = kb;
                     lv_obj_t *lbl = lv_obj_get_child(s_content, 0);
                     if (lbl) {
                         char buf[32];

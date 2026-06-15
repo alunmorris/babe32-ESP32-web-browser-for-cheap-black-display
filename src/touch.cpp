@@ -66,7 +66,7 @@ static void touch_read_cb(lv_indev_drv_t *drv, lv_indev_data_t *data) {
         s_touch_active = true;
         if (s_touch_dbg_count < 5) {
             dbg("TOUCH: raw(%d,%d) -> landscape(%d,%d)", tx, ty,
-                data->point.x, data->point.y);
+                (int)data->point.x, (int)data->point.y);
             s_touch_dbg_count++;
         }
     } else {
