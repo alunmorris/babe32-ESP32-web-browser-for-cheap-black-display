@@ -51,3 +51,6 @@ bool fetch_cancelled();
 
 // Get pointer to the raw fetch buffer (may contain partial data during fetch).
 char *fetch_buf_ptr();
+
+// Clear stored cookies for a specific host (forces a new session on next request).
+void fetcher_clear_host_cookies(const char *host);

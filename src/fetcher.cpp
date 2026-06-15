@@ -104,6 +104,15 @@ static CookieEntry *cookie_find(const char *host) {
     return nullptr;
 }
 
+void fetcher_clear_host_cookies(const char *host) {
+    for (int i = 0; i < COOKIE_MAX_HOSTS; i++)
+        if (s_cookies[i].host[0] && strcmp(s_cookies[i].host, host) == 0) {
+            s_cookies[i].host[0] = '\0';
+            s_cookies[i].data[0] = '\0';
+            return;
+        }
+}
+
 static CookieEntry *cookie_alloc(const char *host) {
     // Find existing
     CookieEntry *e = cookie_find(host);

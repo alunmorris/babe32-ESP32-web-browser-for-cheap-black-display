@@ -14,6 +14,7 @@
 #include "ui_header.h"
 #include "ui_buttons.h"
 #include "url_utils.h"
+#include "fetcher.h"
 #include <Arduino.h>
 #include <string.h>
 #include <freertos/task.h>
@@ -74,6 +75,8 @@ static void menu_item_cb(lv_event_t *e) {
         if (strcmp(label, "Search") == 0 || strcmp(label, "Wikipedia") == 0)
             if (s_urls_cb) s_urls_cb();
         if (s_menu[idx].url) {
+            if (strcmp(s_menu[idx].url, AICHAT_URL) == 0)
+                fetcher_clear_host_cookies("webmashing.com");
             if (s_nav_cb) s_nav_cb(s_menu[idx].url);
         } else if (strcmp(label, "Wikipedia") == 0) {
             show_wiki_search();

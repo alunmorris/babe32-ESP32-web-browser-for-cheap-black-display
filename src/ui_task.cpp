@@ -35,7 +35,7 @@
 
 #define HOMEPAGE "https://html.duckduckgo.com/lite"
 #define AICHAT_URL "https://webmashing.com/aichat.php"
-#define KB_HEIGHT 150
+#define KB_HEIGHT 200
 
 #include "kb_maps.h"
 
@@ -47,6 +47,8 @@ static lv_obj_t         *s_url_btn       = nullptr;
 static lv_obj_t         *s_img_btn       = nullptr;
 static lv_obj_t         *s_aichat_home   = nullptr;
 static bool              s_kb_visible    = false;
+static bool              s_kb_shifted    = false;
+static bool              s_kb_numrow     = false;
 static bool              s_show_links    = true;
 static bool              s_show_images   = true;
 static ParseResult      *s_cur_result    = nullptr;
@@ -256,12 +258,48 @@ static void retry_current() {
 
 // --- Keyboard management ---
 
+// Switch to the mode that matches the two toggle booleans.
+// LVGL may have already set a different mode (from intercepting "ABC"/"1#");
+// this corrects it to the right one of the 4 states.
+static void kb_sync_mode() {
+    lv_keyboard_mode_t mode;
+    if      (!s_kb_shifted && !s_kb_numrow) mode = LV_KEYBOARD_MODE_TEXT_LOWER;
+    else if ( s_kb_shifted && !s_kb_numrow) mode = LV_KEYBOARD_MODE_TEXT_UPPER;
+    else if (!s_kb_shifted &&  s_kb_numrow) mode = LV_KEYBOARD_MODE_SPECIAL;
+    else                                    mode = LV_KEYBOARD_MODE_NUMBER;
+    lv_keyboard_set_mode(s_kb, mode);
+}
+
 static void kb_value_changed_cb(lv_event_t *e) {
     uint16_t btn_id = lv_btnmatrix_get_selected_btn(s_kb);
     if (btn_id == LV_BTNMATRIX_BTN_NONE) return;
     const char *txt = lv_btnmatrix_get_btn_text(s_kb, btn_id);
-    if (txt && strcmp(txt, LV_SYMBOL_UP) == 0) {
-        // Default handler already typed the symbol — remove it
+    if (!txt) return;
+
+    if (strcmp(txt, "SFT") == 0) {
+        // LVGL typed "SFT" as text — delete it, toggle shift, sync mode
+        lv_obj_t *ta = lv_keyboard_get_textarea(s_kb);
+        if (ta) {
+            lv_textarea_del_char(ta);
+            lv_textarea_del_char(ta);
+            lv_textarea_del_char(ta);
+        }
+        s_kb_shifted = !s_kb_shifted;
+        kb_sync_mode();
+    } else if (strcmp(txt, "1#") == 0) {
+        // LVGL already switched to SPECIAL; toggle our numrow flag and sync
+        s_kb_numrow = !s_kb_numrow;
+        kb_sync_mode();
+    } else if (strcmp(txt, "ENT") == 0) {
+        // LVGL typed "ENT" as text — delete it and fire READY
+        lv_obj_t *ta = lv_keyboard_get_textarea(s_kb);
+        if (ta) {
+            lv_textarea_del_char(ta);
+            lv_textarea_del_char(ta);
+            lv_textarea_del_char(ta);
+        }
+        lv_event_send(s_kb, LV_EVENT_READY, NULL);
+    } else if (strcmp(txt, LV_SYMBOL_UP) == 0) {
         lv_obj_t *ta = lv_keyboard_get_textarea(s_kb);
         if (ta) {
             size_t sym_len = strlen(LV_SYMBOL_UP);
@@ -470,17 +508,19 @@ void ui_build_root() {
     // Keys — pressed
     lv_obj_set_style_bg_color(s_kb, lv_color_hex(0x4FC3F7), LV_PART_ITEMS | LV_STATE_PRESSED);
     lv_obj_set_style_text_color(s_kb, lv_color_hex(0x1A1A2E), LV_PART_ITEMS | LV_STATE_PRESSED);
-    // Keys — checked (Shift, ABC/123)
-    lv_obj_set_style_bg_color(s_kb, lv_color_hex(0x0A2040), LV_PART_ITEMS | LV_STATE_CHECKED);
-    lv_obj_set_style_text_color(s_kb, lv_color_hex(0xE0E0E0), LV_PART_ITEMS | LV_STATE_CHECKED);
+    // Keys — checked (ABC active, 1# active, DEL, cursor, ENT, hide)
+    lv_obj_set_style_bg_color(s_kb, lv_color_hex(0x1565C0), LV_PART_ITEMS | LV_STATE_CHECKED);
+    lv_obj_set_style_text_color(s_kb, lv_color_hex(0xFFFFFF), LV_PART_ITEMS | LV_STATE_CHECKED);
     lv_obj_add_flag(s_kb, LV_OBJ_FLAG_HIDDEN);
     // Apply custom 5-row maps
     lv_keyboard_set_map(s_kb, LV_KEYBOARD_MODE_TEXT_LOWER,
-                        (const char **)kb_map_lc, kb_ctrl_lc);
+                        (const char **)kb_map_lc,   kb_ctrl_lc);
     lv_keyboard_set_map(s_kb, LV_KEYBOARD_MODE_TEXT_UPPER,
-                        (const char **)kb_map_uc, kb_ctrl_uc);
+                        (const char **)kb_map_uc,   kb_ctrl_uc);
     lv_keyboard_set_map(s_kb, LV_KEYBOARD_MODE_SPECIAL,
                         (const char **)kb_map_spec, kb_ctrl_spec);
+    lv_keyboard_set_map(s_kb, LV_KEYBOARD_MODE_NUMBER,
+                        (const char **)kb_map_sym,  kb_ctrl_sym);
     lv_obj_add_event_cb(s_kb, kb_value_changed_cb, LV_EVENT_VALUE_CHANGED, NULL);
     lv_obj_add_event_cb(s_kb, kb_event_cb, LV_EVENT_READY, NULL);
     lv_obj_add_event_cb(s_kb, kb_event_cb, LV_EVENT_CANCEL, NULL);
