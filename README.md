@@ -34,7 +34,7 @@ https://youtu.be/If5GsIW79E0?si=GUtGvhs5Pg7Q8_43
 | Flash     | 16 MB QIO (quad SPI) |
 | PSRAM     | 8 MB OPI (octal SPI) high-speed |
 | Display   | 320×480 AXS15231B (landscape: 480×320), QSPI interface |
-| Touch     | GT911, I²C |
+| Touch     | AXS15231B (built-in), I²C |
 
 The board is widely sold under several brand names (Guition, Sunton, Elecrow 4.0"). Look for the **JC3248W535C** or **ESP32-S3-4848S040** part number.
 
@@ -47,7 +47,7 @@ Two FreeRTOS tasks communicate via a message queue:
 ```
 Core 0 — Network Task              Core 1 — UI Task
   WiFi management                    LVGL lv_timer_handler()
-  HTTPS fetch (2 MB PSRAM buffer)    GT911 touch polling
+  HTTPS fetch (2 MB PSRAM buffer)    AXS15231B touch polling
   Single-pass HTML tokenizer         Widget builder
   PageElement array builder          Gesture detection
           |                                  |
@@ -144,7 +144,7 @@ babe32/
 └── src/
     ├── main.cpp               # Entry point
     ├── display.{h,cpp}        # AXS15231B QSPI display driver + LVGL flush
-    ├── touch.{h,cpp}          # GT911 touch driver + LVGL indev
+    ├── touch.{h,cpp}          # AXS15231B touch driver + LVGL indev
     ├── ui_task.{h,cpp}        # LVGL FreeRTOS task (core 1)
     ├── net_task.{h,cpp}       # Network FreeRTOS task (core 0)
     ├── wifi_mgr.{h,cpp}       # Multi-AP NVS storage + connect
