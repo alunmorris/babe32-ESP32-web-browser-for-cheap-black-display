@@ -39,6 +39,7 @@ https://youtu.be/If5GsIW79E0?si=GUtGvhs5Pg7Q8_43
 The board is widely sold under several brand names (Guition, Sunton, Elecrow 4.0"). Look for the **JC3248W535C** or **ESP32-S3-4848S040** (480x480 display) part numbers. The code will need modding to use the latter.
 
 Note that for battery power, when a battery is connected (with a switch or otherwise) SW1 must be pushed to enable the on-board power IC.
+
 ---
 
 ## Architecture
